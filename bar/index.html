@@ -172,19 +172,21 @@
     }).join('');
     h += '</div><div class="tot"><div class="cifra"><span>Totale</span><span>' + X.euro(totale()) + '</span></div>' +
       '<div class="paga"><button class="btn ver big" data-pay="contanti"' + (S.carrello.length ? '' : ' disabled') + '>Contanti</button>' +
-      '<button class="btn blu big" data-pay="carta"' + (S.carrello.length ? '' : ' disabled') + '>Carta</button></div></div>';
+      '<button class="btn blu big" data-pay="carta"' + (S.carrello.length ? '' : ' disabled') + '>Carta</button></div>' +
+      '<button class="btn lin full" data-pay="omaggio" style="margin-top:10px;min-height:46px"' + (S.carrello.length ? '' : ' disabled') + '>Omaggio / consumo staff</button></div>';
     return h;
   }
 
   function aperte() { return vendite().filter(function (v) { return !v.chiusa; }); }
   function somme(lista) {
-    var o = {n: 0, contanti: 0, carta: 0, tot: 0, prodotti: {}};
+    var o = {n: 0, contanti: 0, carta: 0, tot: 0, omaggi: 0, omaggiVal: 0, prodotti: {}};
     lista.forEach(function (v) {
+      if (v.metodo === 'omaggio') { v.righe.forEach(function (r) { o.omaggi += r.q; o.prodotti[r.nome.replace(/^STORNO /, '')] = (o.prodotti[r.nome.replace(/^STORNO /, '')] || 0) + r.q; }); o.omaggiVal += v.totale; return; }
       if (v.totale > 0) o.n++;
       o[v.metodo === 'carta' ? 'carta' : 'contanti'] += v.totale; o.tot += v.totale;
       v.righe.forEach(function (r) { o.prodotti[r.nome] = (o.prodotti[r.nome] || 0) + r.q; });
     });
-    ['contanti', 'carta', 'tot'].forEach(function (n) { o[n] = Math.round(o[n] * 100) / 100; });
+    ['contanti', 'carta', 'tot', 'omaggiVal'].forEach(function (n) { o[n] = Math.round(o[n] * 100) / 100; });
     return o;
   }
   function vOggi() {
@@ -194,8 +196,9 @@
       '<div class="card"><span class="muted">Incassato</span><b>' + X.euro(s.tot) + '</b></div>' +
       '<div class="card"><span class="muted">Contanti</span><b>' + X.euro(s.contanti) + '</b></div>' +
       '<div class="card"><span class="muted">Carta</span><b>' + X.euro(s.carta) + '</b></div>' +
-      '<div class="card"><span class="muted">Scontrini</span><b>' + s.n + '</b></div></div>';
-    if (top.length) h += '<div class="card" style="margin-bottom:14px"><h3>Più venduti</h3>' + top.map(function (t) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--linea)"><span>' + X.esc(t[0]) + '</span><b>' + t[1] + '</b></div>'; }).join('') + '</div>';
+      '<div class="card"><span class="muted">Scontrini</span><b>' + s.n + '</b></div>' +
+      '<div class="card"><span class="muted">Omaggi e staff</span><b>' + s.omaggi + ' pz</b><small class="muted">valore ' + X.euro(s.omaggiVal) + '</small></div></div>';
+    if (top.length) h += '<div class="card" style="margin-bottom:14px"><h3>Consumi di oggi (venduti + omaggi)</h3>' + top.map(function (t) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--linea)"><span>' + X.esc(t[0]) + '</span><b>' + t[1] + '</b></div>'; }).join('') + '</div>';
     var err = X.errori();
     if (err.length) h += '<div class="card" style="margin-bottom:14px;border:2px solid var(--rosso)"><h3>Da controllare (' + err.length + ')</h3>' + err.slice(0, 10).map(function (e) { return '<div class="muted" style="padding:4px 0">' + X.esc(e.tipo) + ' · ' + X.esc(e.errore) + '</div>'; }).join('') + '<button class="btn lin" data-act="pulisciErr" style="margin-top:8px">Ho visto, nascondi</button></div>';
     h += '<div class="card"><h3>Scontrini</h3><div class="lista">';
@@ -204,9 +207,9 @@
     h += lista.slice().reverse().map(function (v) {
       var annullabile = !v.chiusa && v.totale > 0 && !v.annullata;
       return '<div class="el' + (v.annullata ? ' ann' : '') + '"><div class="d"><b>' + X.esc(v.righe.map(function (r) { return r.q + '× ' + r.nome; }).join(', ')) + '</b>' +
-        '<small>' + X.ora(v.quando) + ' · ' + (v.metodo === 'carta' ? 'carta' : 'contanti') + ' · ' + X.esc(v.operatore || '') +
+        '<small>' + X.ora(v.quando) + ' · ' + (v.metodo === 'omaggio' ? '<span class="badge ara">' + X.esc((v.motivo || 'omaggio') + (v.perChi ? ': ' + v.perChi : '')) + '</span>' : v.metodo === 'carta' ? 'carta' : 'contanti') + ' · ' + X.esc(v.operatore || '') +
         (coda.indexOf(v.id) >= 0 ? ' · <span class="badge ara">da inviare</span>' : ' · <span class="badge ver">salvato</span>') + (v.chiusa ? ' · chiusa' : '') + '</small></div>' +
-        '<b>' + X.euro(v.totale) + '</b>' + (annullabile ? '<button class="btn lin" data-ann="' + v.id + '" style="min-height:42px;padding:0 12px">Annulla</button>' : '') + '</div>';
+        '<b>' + (v.metodo === 'omaggio' ? '0,00 €' : X.euro(v.totale)) + '</b>' + (annullabile ? '<button class="btn lin" data-ann="' + v.id + '" style="min-height:42px;padding:0 12px">Annulla</button>' : '') + '</div>';
     }).join('');
     return h + '</div></div></section>';
   }
@@ -216,7 +219,8 @@
     var h = '<section class="pann"><h2>Chiusura cassa</h2><p class="muted" style="margin-top:0">Vendite non ancora chiuse su questo dispositivo' + (giorni.length ? ' (' + giorni.map(function (d) { return d.slice(8) + '/' + d.slice(5, 7); }).join(', ') + ')' : '') + '. Alla chiusura il gestionale scrive gli incassi nel Flusso di Cassa, divisi per categoria e metodo.</p>' +
       '<div class="kpi"><div class="card"><span class="muted">Contanti attesi</span><b>' + X.euro(s.contanti) + '</b></div>' +
       '<div class="card"><span class="muted">Carta</span><b>' + X.euro(s.carta) + '</b></div>' +
-      '<div class="card"><span class="muted">Scontrini</span><b>' + s.n + '</b></div></div>';
+      '<div class="card"><span class="muted">Scontrini</span><b>' + s.n + '</b></div>' +
+      (s.omaggi ? '<div class="card"><span class="muted">Omaggi e staff</span><b>' + s.omaggi + ' pz</b><small class="muted">non entrano in cassa</small></div>' : '') + '</div>';
     if (!lista.length) return h + '<div class="card vuota">Niente da chiudere: nessuna vendita aperta.</div></section>';
     h += '<div class="card"><label class="campo"><span>Contanti contati nel cassetto (facoltativo)</span><input id="contati" inputmode="decimal" placeholder="es. ' + s.contanti.toFixed(2).replace('.', ',') + '"></label>' +
       '<div id="diff" class="muted" style="font-weight:700;min-height:22px"></div>' +
@@ -263,6 +267,14 @@
   function paga(metodo) {
     if (!S.carrello.length) return;
     if (!operatore()) return scegliOperatore(function () { paga(metodo); });
+    if (metodo === 'omaggio') {
+      apri('omaggio', 'Omaggio o consumo staff', '<div class="resto" style="background:var(--ocra-soft);color:var(--ocra)"><span>' + pezzi() + (pezzi() === 1 ? ' articolo' : ' articoli') + ' · non si incassa</span><span>0,00 €</span></div>' +
+        '<p class="muted" style="margin:12px 0 6px">Perché non si paga?</p><div class="scelte" id="omMot">' + ['Consumo staff', 'Omaggio', 'Altro'].map(function (m, i) { return '<button class="scelta' + (i ? '' : ' on') + '" data-mot="' + m + '">' + m + '</button>'; }).join('') + '</div>' +
+        '<label class="campo"><span>Per chi</span><input id="omChi" value="' + X.esc(operatore()) + '" placeholder="Nome" autocomplete="off"></label>' +
+        '<p class="muted" style="font-size:14px">Viene contato nei consumi (così le scorte tornano), ma non entra nel Flusso di Cassa.</p>' +
+        '<div class="azioni"><button class="btn lin" data-act="x">Indietro</button><button class="btn amb big" data-act="confOmaggio">Registra</button></div>');
+      return;
+    }
     if (metodo === 'carta') {
       apri('carta', 'Pagamento con carta', '<div class="resto"><span>Da incassare col POS</span><span>' + X.euro(totale()) + '</span></div><p class="muted">Conferma solo dopo che il pagamento sul POS è andato a buon fine.</p><div class="azioni"><button class="btn lin" data-act="x">Indietro</button><button class="btn blu big" data-act="confCarta">Pagato con carta</button></div>');
       return;
@@ -283,13 +295,14 @@
     var resto = Math.round((r - t) * 100) / 100;
     el.innerHTML = '<div class="resto' + (resto < 0 ? ' no' : '') + '"><span>Ricevuti ' + X.euro(r) + ' · ' + (resto < 0 ? 'mancano' : 'resto') + '</span><span>' + X.euro(Math.abs(resto)) + '</span></div>';
   }
-  function registraVendita(metodo) {
+  function registraVendita(metodo, extra) {
     var v = {tipo: 'vendita', id: X.uuid(), quando: X.adesso(), data: X.oggi(), operatore: operatore(), metodo: metodo,
       righe: S.carrello.map(function (r) { return {id: r.id, nome: r.nome, prezzo: r.prezzo, q: r.q, cassa: r.cassa}; }), totale: totale()};
+    Object.keys(extra || {}).forEach(function (k) { v[k] = extra[k]; });
     var lista = vendite(); lista.push(v); salvaVendite(lista);
     X.accoda(v);
     S.carrello = []; chiudiDlg(); render();
-    X.toast('Venduto · ' + X.euro(v.totale) + (metodo === 'carta' ? ' con carta' : ' in contanti'), 'ok');
+    X.toast(metodo === 'omaggio' ? 'Registrato come ' + (v.motivo || 'omaggio').toLowerCase() + ' · ' + v.righe.reduce(function (a, r) { return a + r.q; }, 0) + ' pz' : 'Venduto · ' + X.euro(v.totale) + (metodo === 'carta' ? ' con carta' : ' in contanti'), 'ok');
   }
   function annulla(id) {
     var lista = vendite(), v = lista.filter(function (x) { return x.id === id; })[0];
@@ -369,6 +382,7 @@
     if (d.pay) return paga(d.pay);
     if (d.ann) return annulla(d.ann);
     if (d.op) { [].forEach.call(document.querySelectorAll('[data-op]'), function (b) { b.classList.toggle('on', b === t); }); $('#opNome').value = ''; return; }
+    if (d.mot) { [].forEach.call(t.parentNode.children, function (b) { b.classList.toggle('on', b === t); }); return; }
     if (d.ric) { S.ricevuto = String(d.ric).replace('.', ','); aggiornaResto(); return; }
     if (d.tasto) {
       if (d.tasto === '⌫') S.ricevuto = S.ricevuto.slice(0, -1);
@@ -382,6 +396,7 @@
       case 'svuota': S.carrello = []; chiudiDlg(); return render();
       case 'confCarta': return registraVendita('carta');
       case 'confContanti': return registraVendita('contanti');
+      case 'confOmaggio': { var mb = document.querySelector('#omMot .on'); return registraVendita('omaggio', {motivo: mb ? mb.dataset.mot : 'Omaggio', perChi: (($('#omChi') || {}).value || '').trim().slice(0, 60)}); }
       case 'confAnn': return confermaAnnullo(d.id);
       case 'chiudi': return chiudiCassa();
       case 'pulisciErr': X.set('errori', []); X.aggiornaStato(); return render();

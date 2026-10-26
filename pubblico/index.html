@@ -64,7 +64,7 @@
   <button class="tab" data-v="cassa">Registra un pagamento</button>
   <a class="tab" href="../forni/" style="text-decoration:none">Forni e prenotazioni</a>
   <button class="tab" data-v="cal">Turni ed eventi</button>
-  <button class="tab" data-v="avvisi">Avvisi</button>
+  <button class="tab" data-v="avvisi">Avvisi e desideri</button>
 </nav>
 <main id="app"></main>
 <dialog id="dlg"></dialog>
@@ -111,6 +111,7 @@
     out += '<div class="card"><h3>Forni adesso</h3>' + statoForni() + '<a class="btn lin full" href="../forni/" style="margin-top:10px;text-decoration:none">Apri forni e prenotazioni</a></div>';
     var ev = (p.eventi || []).slice(0, 3);
     out += '<div class="card"><h3>Prossimi eventi</h3>' + (ev.length ? ev.map(evHtml).join('') : '<div class="muted">Nessun evento in programma.</div>') + '</div>';
+    out += desideriCard(4);
     var av = (p.avvisi || []).filter(function (a) { return a.fissa || a.priorita === 'importante'; }).slice(0, 3);
     if (av.length) out += '<div class="card"><h3>Avvisi</h3>' + av.map(avvHtml).join('') + '</div>';
     return out + '</div></div>';
@@ -139,7 +140,8 @@
 
   function vCassa() {
     var out = '<div class="wrap"><h2>Registra un pagamento</h2><div class="info">Si registrano solo entrate. Ogni pagamento viene salvato con il tuo nome e il direttivo lo vede evidenziato.</div><div class="tiles">' +
-      VOCI.map(function (v) { return '<button class="tile" data-voce="' + v.id + '"><span class="e">' + v.e + '</span><span><b>' + v.label + '</b><br><small>' + (v.imp ? X.euro(v.imp) : 'importo libero') + '</small></span></button>'; }).join('') + '</div>';
+      VOCI.map(function (v) { return '<button class="tile" data-voce="' + v.id + '"><span class="e">' + v.e + '</span><span><b>' + v.label + '</b><br><small>' + (v.imp ? X.euro(v.imp) : 'importo libero') + '</small></span></button>'; }).join('') +
+      '<button class="tile" data-dono="" style="border-top-color:var(--ocra)"><span class="e">🎁</span><span><b>Dono di materiale</b><br><small>oggetti, attrezzi, materiali: non è un pagamento</small></span></button></div>';
     out += '<div class="card" style="margin-top:18px"><h3>Pagamenti registrati oggi</h3>' + listaOggi() + '</div>';
     return out + '</div>';
   }
@@ -163,7 +165,39 @@
   }
   function vAvvisi() {
     var av = P().avvisi || [];
-    return '<div class="wrap"><h2>Avvisi</h2><div class="card">' + (av.length ? av.map(avvHtml).join('') : '<div class="muted">Nessun avviso.</div>') + '</div></div>';
+    return '<div class="wrap"><div class="col2"><div><h2>Avvisi</h2><div class="card">' + (av.length ? av.map(avvHtml).join('') : '<div class="muted">Nessun avviso.</div>') + '</div></div><div><h2>Cosa ci servirebbe</h2>' + desideriCard(50, true) + '</div></div></div>';
+  }
+  function desideriCard(n, senzaTitolo) {
+    var d = (P().desideri || []).slice().sort(function (a, b) { return (a.priorita === 'alta' ? 0 : 1) - (b.priorita === 'alta' ? 0 : 1); });
+    if (!d.length && !senzaTitolo) return '';
+    var h = '<div class="card">' + (senzaTitolo ? '' : '<h3>🎁 Cosa ci servirebbe</h3>') + '<p class="muted" style="margin-top:0">Se hai qualcosa di questa lista e vuoi donarla all\'associazione, grazie! Registrala qui sotto o lasciala a qualcuno del direttivo.</p>';
+    h += d.length ? d.slice(0, n).map(function (x) {
+      return '<div class="riga"><div class="d"><b>' + X.esc(x.cosa) + '</b>' + (x.priorita === 'alta' ? ' <span class="badge ros">urgente</span>' : '') + '<small>' + X.esc([x.quantita, x.dettagli].filter(Boolean).join(' · ')) + '</small></div><button class="btn lin" style="min-height:42px;padding:0 12px" data-dono="' + X.esc(x.id) + '">Lo dono io</button></div>';
+    }).join('') : '<div class="muted">Per ora non ci serve niente di particolare.</div>';
+    if (n < d.length) h += '<button class="btn lin full" data-v="avvisi" style="margin-top:10px">Vedi tutta la lista (' + d.length + ')</button>';
+    return h + '</div>';
+  }
+  function apriDono(idDes) {
+    var x = (P().desideri || []).filter(function (d) { return d.id === idDes; })[0];
+    S.desiderio = x ? x.id : '';
+    dlg.innerHTML = '<div class="dlg-h"><h2>🎁 Dono di materiale</h2><button class="dlg-x" data-act="x" aria-label="Chiudi">×</button></div><div class="dlg-b">' +
+      '<div class="info" style="margin-bottom:6px">Non è un pagamento: viene annotato tra le donazioni ricevute, non nel bilancio.</div>' +
+      '<label class="campo"><span>Cosa viene donato</span><input id="dCosa" autocomplete="off" value="' + X.esc(x ? x.cosa : '') + '" placeholder="es. 10 kg di argilla, un trapano"></label>' +
+      '<label class="campo"><span>Quantità (facoltativo)</span><input id="dQ" autocomplete="off" placeholder="es. 2 sacchi"></label>' +
+      '<label class="campo"><span>Valore stimato in € (facoltativo)</span><input id="dVal" inputmode="decimal" placeholder="es. 30"></label>' +
+      '<label class="campo"><span>Chi lo dona (facoltativo)</span><input id="dDon" autocomplete="off" placeholder="Nome, o lascia vuoto se anonimo"></label>' +
+      '<label class="campo"><span>Il tuo nome e cognome (chi registra)</span><input id="dChi" autocomplete="off" placeholder="Obbligatorio"></label>' +
+      '<button class="btn amb big full" data-act="salvaDono">Registra il dono</button></div>';
+    dlg.showModal();
+  }
+  function salvaDono() {
+    var cosa = $('#dCosa').value.trim(), chi = $('#dChi').value.trim(), val = $('#dVal').value.trim().replace(',', '.');
+    if (cosa.length < 2) return X.toast('Scrivi cosa viene donato.', 'err');
+    if (val && !(Number(val) >= 0)) return X.toast('Il valore stimato non è un numero.', 'err');
+    if (chi.length < 3 || chi.indexOf(' ') < 0) return X.toast('Scrivi il tuo nome e cognome.', 'err');
+    X.accoda({tipo: 'donazione', cosa: cosa.slice(0, 200), quantita: $('#dQ').value.trim().slice(0, 60), valore: val, donatore: $('#dDon').value.trim().slice(0, 120), nome: chi.slice(0, 80), desiderio: S.desiderio || '', data: X.oggi()});
+    if (S.desiderio && S.srv && S.srv.pubblico) S.srv.pubblico.desideri = (S.srv.pubblico.desideri || []).filter(function (d) { return d.id !== S.desiderio; });
+    dlg.close(); render(); X.toast('Grazie! Dono registrato.', 'ok');
   }
 
   /* ---------- registrazione pagamento ---------- */
@@ -226,11 +260,13 @@
     var t = ev.target.closest('button'); if (!t) return;
     var d = t.dataset;
     if (d.v) { S.vista = d.v; render(); window.scrollTo(0, 0); return; }
+    if (d.dono != null) { if (dlg.open) dlg.close(); return apriDono(d.dono); }
     if (d.voce) { if (dlg.open) dlg.close(); return apriVoce(d.voce); }
     if (d.met) { [].forEach.call(t.parentNode.children, function (b) { b.classList.toggle('on', b === t); }); return; }
     if (d.act === 'x') return dlg.close();
     if (d.act === 'conferma') return conferma();
     if (d.act === 'salva') return salva();
+    if (d.act === 'salvaDono') return salvaDono();
     if (d.act === 'setK') return provaChiave();
   });
   dlg.addEventListener('click', function (ev) { if (ev.target === dlg) dlg.close(); });
