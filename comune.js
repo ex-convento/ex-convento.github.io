@@ -50,9 +50,13 @@
     return c;
   })();
 
+  /* ---------- computer pubblico: nessun nome ricordato, si chiede ogni volta ---------- */
+  X.pubblico = function () { try { return localStorage.getItem('excv_modo') === 'pubblico'; } catch (e) { return false; } };
+
   /* ---------- server ---------- */
   X.call = function (a, extra) {
     var body = {a: a, k: X.chiave()};
+    if (opts.extra) body.extra = opts.extra;
     Object.keys(extra || {}).forEach(function (n) { body[n] = extra[n]; });
     var ctl = window.AbortController ? new AbortController() : null;
     var to = setTimeout(function () { if (ctl) ctl.abort(); }, 30000);

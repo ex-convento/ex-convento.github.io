@@ -63,6 +63,7 @@
   <div class="brand"><img src="../logo.png" alt="" width="45" height="34"><div><b>EX CONVENTO</b><small>Forni</small></div></div>
   <div class="spazio"></div>
   <span id="sync" class="sync">…</span>
+  <a id="torna" class="chip" href="../pubblico/" style="display:none;text-decoration:none">‹ Torna all'inizio</a>
   <button id="opBtn" class="chip vuoto">Chi sei?</button>
 </header>
 <nav class="tabs" id="viste">
@@ -93,7 +94,9 @@
 
   function colForno(t) { t = t.toUpperCase(); return t.indexOf('BLU') >= 0 ? '#2f6f9a' : t.indexOf('ROSSO') >= 0 ? '#b33f28' : t.indexOf('GRANDE') >= 0 ? '#94660a' : '#4f4a42'; }
   function nomeForno(t) { return t.replace(/^FORNO\s+/i, 'Forno ').replace(/\b(\w)(\w*)/g, function (m, a, b) { return a + b.toLowerCase(); }).replace(/^Forno/, 'Forno'); }
-  function operatore() { return X.get('operatore', ''); }
+  var PUB = X.pubblico();
+  function operatore() { return PUB ? (S.opTemp || '') : X.get('operatore', ''); }
+  function dimentica() { if (PUB) setTimeout(function () { S.opTemp = ''; render(); }, 0); }
   function locali() { return X.get('eventi', []); }
   function tabs() { return (S.srv && S.srv.forni && S.srv.forni.tabs) || ['FORNO BLU', 'FORNO ROSSO', 'FORNO GRANDE']; }
 
@@ -136,7 +139,8 @@
   /* ---------- viste ---------- */
   function render() {
     document.querySelectorAll('#viste .tab').forEach(function (t) { t.classList.toggle('on', t.dataset.v === S.vista); });
-    var op = operatore(), ob = $('#opBtn'); ob.textContent = op ? op : 'Chi sei?'; ob.classList.toggle('vuoto', !op);
+    var op = operatore(), ob = $('#opBtn'); ob.textContent = op ? op : 'Chi sei?'; ob.classList.toggle('vuoto', !op); ob.style.display = PUB ? 'none' : '';
+    var tb = $('#torna'); if (tb) tb.style.display = PUB ? '' : 'none';
     var a = $('#app');
     if (S.vista === 'stato') a.innerHTML = vStato();
     else if (S.vista === 'pren') a.innerHTML = vPren();
@@ -231,11 +235,11 @@
     return '<div class="scelte" data-gruppo="' + nome + '">' + t.map(function (x) { return '<button type="button" class="scelta' + (x === sel ? ' on' : '') + '" data-sc="' + X.esc(x) + '">' + X.esc(x) + '</button>'; }).join('') + '</div>';
   }
   function valScelta(nome) { var b = document.querySelector('[data-gruppo="' + nome + '"] .scelta.on'); return b ? b.dataset.sc : ''; }
-  function chiedi(fn) { if (!operatore()) return scegliOperatore(fn); fn(); }
+  function chiedi(fn) { if (PUB) S.opTemp = ''; if (!operatore()) return scegliOperatore(fn); fn(); }
   function scegliOperatore(poi) {
-    var ops = (S.srv && S.srv.operatori) || [], op = operatore();
+    var ops = PUB ? [] : ((S.srv && S.srv.operatori) || []), op = operatore();
     S.dopoOp = poi || null;
-    apri('Chi sei?', '<p class="muted" style="margin-top:0">Ogni movimento dei forni viene registrato con questo nome.</p><div class="scelte">' + ops.map(function (n) { return '<button class="scelta' + (n === op ? ' on' : '') + '" data-op="' + X.esc(n) + '">' + X.esc(n) + '</button>'; }).join('') + '</div>' +
+    apri(PUB ? 'Come ti chiami?' : 'Chi sei?', '<p class="muted" style="margin-top:0">Ogni movimento dei forni viene registrato con questo nome' + (PUB ? ' (computer pubblico: lo chiediamo a ogni operazione).' : '.') + '</p><div class="scelte">' + ops.map(function (n) { return '<button class="scelta' + (n === op ? ' on' : '') + '" data-op="' + X.esc(n) + '">' + X.esc(n) + '</button>'; }).join('') + '</div>' +
       '<label class="campo"><span>' + (ops.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" autocomplete="off" placeholder="Nome e cognome"></label><button class="btn prim full" data-act="opOk">Conferma</button>');
   }
   function evento(t, stato, extra) {
@@ -243,7 +247,7 @@
     Object.keys(extra || {}).forEach(function (k) { e[k] = extra[k]; });
     e = X.accoda(e);
     var l = locali(); l.push(e); X.set('eventi', l.slice(-80));
-    chiudiDlg(); render();
+    chiudiDlg(); render(); dimentica();
     X.toast(nomeForno(t) + ': ' + (STATI[stato] || {}).nome.toLowerCase(), 'ok');
   }
   function formCarica(t) {
@@ -328,20 +332,21 @@
         var a = $('#pA').value.trim(); if (!a) return X.toast('Scrivi il nome di chi prenota.', 'err');
         var g = Number($('#pG').value);
         var e = X.accoda({tipo: 'prenotazione', forno: f, giorno: g, artista: a.slice(0, 120), quantita: $('#pQ').value.trim().slice(0, 120), temperatura: valScelta('ptemp'), note: $('#pN').value.trim().slice(0, 300), quando: X.adesso(), operatore: operatore()});
-        var l = locali(); l.push(e); X.set('eventi', l.slice(-80)); S.giorno = g; chiudiDlg(); render(); X.toast('Prenotato ' + nomeForno(f) + ' il ' + g, 'ok'); return;
+        var l = locali(); l.push(e); X.set('eventi', l.slice(-80)); S.giorno = g; chiudiDlg(); render(); dimentica(); X.toast('Prenotato ' + nomeForno(f) + ' il ' + g, 'ok'); return;
       }
       case 'confPaga': {
         var imp = Number(($('#iImp').value || '').replace(',', '.')); if (!(imp > 0)) return X.toast('Importo non valido.', 'err');
         var chi = $('#iChi').value.trim(); if (!chi) return X.toast('Scrivi chi paga.', 'err');
         var p = X.accoda({tipo: 'incasso', forno: f, importo: Math.round(imp * 100) / 100, metodo: valScelta('met') || 'contanti', data: X.oggi(), causale: 'Infornata ' + chi + ' · ' + nomeForno(f), cassa: 'LAB INFORNATE', quando: X.adesso(), operatore: operatore()});
-        var l2 = locali(); l2.push(p); X.set('eventi', l2.slice(-80)); chiudiDlg(); render(); X.toast('Incasso registrato · ' + X.euro(p.importo), 'ok'); return;
+        var l2 = locali(); l2.push(p); X.set('eventi', l2.slice(-80)); chiudiDlg(); render(); dimentica(); X.toast('Incasso registrato · ' + X.euro(p.importo), 'ok'); return;
       }
       case 'pulisciErr': X.set('errori', []); X.aggiornaStato(); return render();
       case 'setK': return provaChiave();
       case 'opOk': {
         var sel = document.querySelector('[data-op].on'), nome = ($('#opNome').value || '').trim() || (sel ? sel.dataset.op : '');
         if (!nome) return X.toast('Scegli o scrivi un nome.', 'err');
-        X.set('operatore', nome.slice(0, 60)); chiudiDlg(); render(); var poi = S.dopoOp; S.dopoOp = null; if (poi) poi(); return;
+        if (nome.length < 2) return X.toast('Scrivi nome e cognome.', 'err');
+        if (PUB) S.opTemp = nome.slice(0, 60); else X.set('operatore', nome.slice(0, 60)); chiudiDlg(); render(); var poi = S.dopoOp; S.dopoOp = null; if (poi) poi(); return;
       }
     }
   });
@@ -360,6 +365,11 @@
   });
   if (!X.chiave()) setup(); else { S.srv = X.stato(); render(); }
   setInterval(function () { if (!dlg.open && S.vista === 'stato') render(); }, 30000);
+  if (PUB) {
+    var ultimo = Date.now();
+    ['pointerdown', 'keydown'].forEach(function (t) { document.addEventListener(t, function () { ultimo = Date.now(); }, true); });
+    setInterval(function () { if (Date.now() - ultimo > 180000) location.href = '../pubblico/'; }, 15000);
+  }
 })();
 </script>
 </body>
