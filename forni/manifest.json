@@ -1,0 +1,13 @@
+{
+  "name": "Forni Ex Convento",
+  "short_name": "Forni",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0b09",
+  "theme_color": "#0d0b09",
+  "icons": [
+    {"src": "../icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "../icon.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

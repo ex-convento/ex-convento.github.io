@@ -1,0 +1,156 @@
+/* Ex Convento · postazioni (bar e forni) — parte comune: chiave, coda offline, sincronizzazione */
+(function () {
+  'use strict';
+  var API = 'https://script.google.com/macros/s/AKfycbwr4sZBvrhmavAtTrBXbNJ0OOsS1yxozXwtbxEpMfuKVz2CDW30YTztDrllZOAfkBuC-Q/exec';
+  var X = window.EXC = {};
+  var app = 'app', opts = {}, busy = false, fails = 0, nextAt = 0, lastOk = 0, lastInit = 0, timer = null;
+
+  /* ---------- memoria locale ---------- */
+  function k(n) { return 'excv_' + app + '_' + n; }
+  X.get = function (n, d) { try { var s = localStorage.getItem(k(n)); return s == null ? d : JSON.parse(s); } catch (e) { return d; } };
+  X.set = function (n, v) { try { localStorage.setItem(k(n), JSON.stringify(v)); } catch (e) { X.toast('Memoria del dispositivo piena: sincronizza e libera spazio.', 'err'); } };
+
+  /* ---------- utilità ---------- */
+  X.uuid = function () {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 20);
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  };
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  X.oggi = function (d) { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  X.adesso = function (d) { d = d || new Date(); return X.oggi(d) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); };
+  X.ora = function (iso) { var m = String(iso || '').match(/T(\d\d:\d\d)/); return m ? m[1] : ''; };
+  X.euro = function (n) { n = Math.round(Number(n || 0) * 100) / 100; return n.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; };
+  X.esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); };
+  X.fra = function (iso) {
+    var t = new Date(String(iso).replace(' ', 'T')).getTime(); if (!t) return '';
+    var m = Math.max(0, Math.round((Date.now() - t) / 60000));
+    if (m < 1) return 'adesso'; if (m < 60) return m + ' min fa';
+    var h = Math.floor(m / 60); if (h < 24) return h + ' h ' + pad(m % 60) + ' fa';
+    return Math.floor(h / 24) + ' g fa';
+  };
+
+  /* ---------- avvisi ---------- */
+  X.toast = function (msg, tipo) {
+    var box = document.getElementById('toasts');
+    if (!box) { box = document.createElement('div'); box.id = 'toasts'; document.body.appendChild(box); }
+    var t = document.createElement('div'); t.className = 'toast ' + (tipo || ''); t.textContent = msg; box.appendChild(t);
+    setTimeout(function () { t.classList.add('via'); }, tipo === 'err' ? 5000 : 2600);
+    setTimeout(function () { t.remove(); }, tipo === 'err' ? 5600 : 3200);
+  };
+
+  /* ---------- chiave della postazione ---------- */
+  X.chiave = function () { try { return localStorage.getItem(k('chiave')) || localStorage.getItem('excv_k') || ''; } catch (e) { return ''; } };
+  X.salvaChiave = function (c) { try { if (c) localStorage.setItem(k('chiave'), c); else localStorage.removeItem(k('chiave')); } catch (e) {} };
+  var chiaveUrl = (function leggiDaUrl() {
+    var u = new URL(location.href), c = (u.searchParams.get('k') || '').trim();
+    if (c) {
+      u.searchParams.delete('k');
+      try { history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); } catch (e) {}
+    }
+    return c;
+  })();
+
+  /* ---------- server ---------- */
+  X.call = function (a, extra) {
+    var body = {a: a, k: X.chiave()};
+    Object.keys(extra || {}).forEach(function (n) { body[n] = extra[n]; });
+    var ctl = window.AbortController ? new AbortController() : null;
+    var to = setTimeout(function () { if (ctl) ctl.abort(); }, 30000);
+    return fetch(API, {method: 'POST', body: JSON.stringify(body), headers: {'Content-Type': 'text/plain;charset=utf-8'}, redirect: 'follow', signal: ctl ? ctl.signal : undefined})
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        clearTimeout(to);
+        if (!j.ok) { var e = new Error(j.error || 'Errore'); e.server = true; throw e; }
+        return j;
+      }, function (e) { clearTimeout(to); throw e; });
+  };
+
+  /* ---------- coda offline ---------- */
+  X.coda = function () { return X.get('coda', []); };
+  X.errori = function () { return X.get('errori', []); };
+  X.accoda = function (item) {
+    item.id = item.id || X.uuid();
+    var c = X.coda(); c.push(item); X.set('coda', c);
+    stato(); setTimeout(X.sync, 50);
+    return item;
+  };
+  X.stato = function () { return X.get('stato', null); };
+
+  function applica(j) {
+    var s = {}; Object.keys(j).forEach(function (n) { if (n !== 'esiti' && n !== 'ok') s[n] = j[n]; });
+    s.ricevuto = Date.now();
+    X.set('stato', s);
+    if (opts.onStato) opts.onStato(s);
+  }
+
+  X.sync = function (forza) {
+    if (busy || !X.chiave()) return Promise.resolve();
+    if (!forza && Date.now() < nextAt) return Promise.resolve();
+    var c = X.coda();
+    if (!c.length && !forza && Date.now() - lastInit < 90000) return Promise.resolve();
+    busy = true; stato();
+    var invio = c.slice(0, 120);
+    var p = invio.length ? X.call('sync', {coda: invio}) : X.call('init');
+    return p.then(function (j) {
+      busy = false; fails = 0; nextAt = 0; lastOk = Date.now(); lastInit = Date.now();
+      if (j.esiti) {
+        var err = X.errori(), resto = [];
+        X.coda().forEach(function (it) {
+          var e = j.esiti[it.id];
+          if (e === 'ok') return;
+          if (e) { it.errore = e; err.unshift(it); return; }
+          resto.push(it);
+        });
+        X.set('coda', resto); X.set('errori', err.slice(0, 50));
+        if (opts.onEsiti) opts.onEsiti(j.esiti);
+        if (resto.length) setTimeout(X.sync, 200);
+      }
+      applica(j); stato();
+    }, function (e) {
+      busy = false;
+      if (e.server && /CHIAVE_NON_VALIDA/.test(e.message)) {
+        X.toast('Questa postazione non è più autorizzata. Serve una nuova chiave.', 'err');
+        if (opts.onChiave) opts.onChiave();
+      }
+      fails++; nextAt = Date.now() + Math.min(300000, 8000 * Math.pow(2, fails - 1));
+      stato();
+    });
+  };
+
+  /* ---------- indicatore di collegamento ---------- */
+  function stato() {
+    var el = document.getElementById('sync'); if (!el) return;
+    var n = X.coda().length, ne = X.errori().length, cls, txt;
+    if (busy) { cls = 'blu'; txt = n ? 'Invio di ' + n + '…' : 'Aggiorno…'; }
+    else if (!navigator.onLine && n) { cls = 'ros'; txt = 'Senza rete · ' + n + ' in attesa'; }
+    else if (!navigator.onLine) { cls = 'ros'; txt = 'Senza rete'; }
+    else if (n && fails) { cls = 'ara'; txt = n + ' in attesa · riprovo'; }
+    else if (n) { cls = 'ara'; txt = n + ' in attesa'; }
+    else if (fails && !lastOk) { cls = 'ara'; txt = 'Collegamento lento'; }
+    else { cls = 'ver'; txt = lastOk ? 'Tutto salvato' : 'Pronto'; }
+    if (ne) { txt += ' · ' + ne + ' da controllare'; cls = 'ros'; }
+    el.className = 'sync ' + cls; el.textContent = txt;
+    el.title = lastOk ? 'Ultimo contatto col gestionale: ' + new Date(lastOk).toLocaleTimeString('it-IT') : 'Nessun contatto ancora';
+  }
+  X.aggiornaStato = stato;
+
+  /* ---------- schermo sempre acceso ---------- */
+  var wl = null;
+  function sveglia() { try { if (navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(function (l) { wl = l; }, function () {}); } catch (e) {} }
+
+  /* ---------- avvio ---------- */
+  X.avvia = function (nome, o) {
+    app = nome; opts = o || {};
+    if (chiaveUrl) { X.salvaChiave(chiaveUrl); chiaveUrl = ''; }
+    if (navigator.serviceWorker && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(function () {});
+    window.addEventListener('online', function () { nextAt = 0; stato(); X.sync(true); });
+    window.addEventListener('offline', stato);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { sveglia(); X.sync(); } });
+    sveglia();
+    stato();
+    var s = X.stato(); if (s && opts.onStato) opts.onStato(s);
+    if (timer) clearInterval(timer);
+    timer = setInterval(function () { stato(); X.sync(); if (opts.onTick) opts.onTick(); }, 20000);
+    if (X.chiave()) X.sync(true);
+  };
+})();

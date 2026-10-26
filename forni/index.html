@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Forni · Ex Convento</title>
+<meta name="theme-color" content="#0d0b09">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Forni Ex Convento">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Josefin+Sans:wght@600;700&display=swap">
+<link rel="stylesheet" href="../comune.css">
+<style>
+  .wrap{padding:16px;max-width:1200px;margin:0 auto}
+  .forni{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .forno{background:var(--sup);border-radius:22px;box-shadow:var(--ombra);overflow:hidden;display:flex;flex-direction:column}
+  .forno .fh{padding:14px 18px;color:#fff;background:var(--fc);display:flex;justify-content:space-between;align-items:center}
+  .forno .fh b{font:700 22px/1 var(--display);letter-spacing:.06em}
+  .forno .fh{flex-wrap:wrap;gap:4px 10px}
+  .forno .fh small{opacity:.85;font-weight:700;font-size:13px}
+  .forno .fb{padding:16px 18px;flex:1;display:flex;flex-direction:column;gap:10px}
+  .st{display:flex;align-items:center;gap:12px}
+  .st .pall{width:18px;height:18px;border-radius:50%;background:var(--sc);box-shadow:0 0 0 6px color-mix(in srgb,var(--sc) 20%,transparent);flex:none}
+  .st .pall.pulse{animation:pu 1.6s infinite}
+  @keyframes pu{50%{box-shadow:0 0 0 12px color-mix(in srgb,var(--sc) 8%,transparent)}}
+  .st b{font:700 26px/1 var(--display)}
+  .timer{font:700 40px/1 var(--display);letter-spacing:.02em}
+  .det{color:var(--muted);line-height:1.5}
+  .det b{color:var(--ink)}
+  .fa{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}
+  .fa .full{grid-column:1/-1}
+  .oggi{border-top:1px solid var(--linea);padding-top:10px;font-size:15px}
+  .oggi .r{display:flex;justify-content:space-between;gap:8px;padding:3px 0}
+  .giorni{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;scrollbar-width:none}
+  .giorni::-webkit-scrollbar{display:none}
+  .gg{flex:none;min-width:64px;padding:8px 10px;border-radius:14px;background:var(--sup);box-shadow:var(--ombra);text-align:center;font-weight:700}
+  .gg small{display:block;font-size:12px;color:var(--muted);text-transform:uppercase}
+  .gg b{font:700 22px/1.1 var(--display)}
+  .gg.on{background:var(--nero);color:#fff}.gg.on small{color:var(--ambra)}
+  .pren{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .slot{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--linea)}
+  .slot .d{flex:1}
+  .slot small{display:block;color:var(--muted)}
+  .tbl{width:100%;border-collapse:collapse}
+  .tbl td,.tbl th{padding:10px 8px;border-bottom:1px solid var(--linea);text-align:left;vertical-align:top}
+  .tbl th{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .tbl td:first-child{font:700 20px/1.1 var(--display);white-space:nowrap}
+  .ev{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--linea);align-items:flex-start}
+  .ev .dot{width:12px;height:12px;border-radius:50%;margin-top:6px;flex:none;background:var(--sc)}
+  .ev .d{flex:1}
+  .ev small{display:block;color:var(--muted)}
+  @media (max-width:520px){.wrap{padding:12px}.timer{font-size:34px}.forno .fb{padding:14px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="../logo.png" alt="" width="45" height="34"><div><b>EX CONVENTO</b><small>Forni</small></div></div>
+  <div class="spazio"></div>
+  <span id="sync" class="sync">…</span>
+  <button id="opBtn" class="chip vuoto">Chi sei?</button>
+</header>
+<nav class="tabs" id="viste">
+  <button class="tab on" data-v="stato">Stato forni</button>
+  <button class="tab" data-v="pren">Prenotazioni</button>
+  <button class="tab" data-v="temp">Temperature</button>
+  <button class="tab" data-v="storico">Storico</button>
+</nav>
+<main id="app"></main>
+<dialog id="dlg"></dialog>
+
+<script src="../comune.js"></script>
+<script>
+(function () {
+  'use strict';
+  var X = window.EXC, $ = function (s, r) { return (r || document).querySelector(s); };
+  var dlg = $('#dlg');
+  var STATI = {
+    libero: {nome: 'Libero', c: '#1b7a4a'},
+    carico: {nome: 'Caricato', c: '#94660a'},
+    cottura: {nome: 'In cottura', c: '#b33f28'},
+    raffreddamento: {nome: 'Raffreddamento', c: '#2f6f9a'},
+    problema: {nome: 'Problema', c: '#7d1f12'},
+    prenotato: {nome: 'Prenotato', c: '#4f4a42'},
+    pagato: {nome: 'Pagato', c: '#1b7a4a'}
+  };
+  var S = {vista: 'stato', giorno: new Date().getDate(), srv: null};
+
+  function colForno(t) { t = t.toUpperCase(); return t.indexOf('BLU') >= 0 ? '#2f6f9a' : t.indexOf('ROSSO') >= 0 ? '#b33f28' : t.indexOf('GRANDE') >= 0 ? '#94660a' : '#4f4a42'; }
+  function nomeForno(t) { return t.replace(/^FORNO\s+/i, 'Forno ').replace(/\b(\w)(\w*)/g, function (m, a, b) { return a + b.toLowerCase(); }).replace(/^Forno/, 'Forno'); }
+  function operatore() { return X.get('operatore', ''); }
+  function locali() { return X.get('eventi', []); }
+  function tabs() { return (S.srv && S.srv.forni && S.srv.forni.tabs) || ['FORNO BLU', 'FORNO ROSSO', 'FORNO GRANDE']; }
+
+  /* ---------- tabella temperature e misure dei forni (dal foglio PRENOTAZIONI) ---------- */
+  function info() {
+    var v = (S.srv && S.srv.forni && S.srv.forni.info && S.srv.forni.info.ok) ? S.srv.forni.info.values : [];
+    var temp = [], misure = {};
+    v.forEach(function (r) {
+      var a = String(r[0] || '').trim();
+      if (/^\d{3,4}\s*°?C$/i.test(a)) temp.push({t: a.replace(/\s/g, ''), m: String(r[1] || '').trim()});
+      else if (/^forno\s/i.test(a)) misure[a.split(/\s+/)[1].toUpperCase()] = {dim: String(r[1] || '').trim(), max: String(r[2] || '').trim()};
+    });
+    return {temp: temp, misure: misure};
+  }
+  function misura(t) { var m = info().misure, k = t.replace(/^FORNO\s+/i, '').toUpperCase(); return m[k] || null; }
+
+  /* ---------- stato di ogni forno: ultimo evento (gestionale + eventi locali non ancora arrivati) ---------- */
+  function statoDi(t) {
+    var best = (S.srv && S.srv.forni && S.srv.forni.stato && S.srv.forni.stato[t]) || null;
+    locali().forEach(function (e) { if (e.tipo === 'forno' && e.forno === t && (!best || e.quando > best.quando)) best = e; });
+    return best || {stato: 'libero', quando: '', operatore: ''};
+  }
+  function prenotazioni(t, d) {
+    var p = S.srv && S.srv.forni && S.srv.forni.prenotazioni && S.srv.forni.prenotazioni[t];
+    var g = p && p.ok && p.values ? p.values[d] : null;
+    var righe = g ? g.righe.slice() : [];
+    var inCoda = X.coda().map(function (c) { return c.id; });
+    locali().forEach(function (e) {
+      if (e.tipo === 'prenotazione' && e.forno === t && Number(e.giorno) === Number(d) && inCoda.indexOf(e.id) >= 0) righe.push([e.artista, e.quantita, e.temperatura, e.note, 'attesa']);
+    });
+    return {righe: righe, libere: g ? Math.max(0, g.libere - righe.filter(function (r) { return r[4] === 'attesa'; }).length) : null, esiste: !!g};
+  }
+
+  function durata(iso) {
+    var t = new Date(iso).getTime(); if (!t) return '';
+    var m = Math.max(0, Math.floor((Date.now() - t) / 60000)), h = Math.floor(m / 60);
+    return h + ':' + (m % 60 < 10 ? '0' : '') + (m % 60);
+  }
+
+  /* ---------- viste ---------- */
+  function render() {
+    document.querySelectorAll('#viste .tab').forEach(function (t) { t.classList.toggle('on', t.dataset.v === S.vista); });
+    var op = operatore(), ob = $('#opBtn'); ob.textContent = op ? op : 'Chi sei?'; ob.classList.toggle('vuoto', !op);
+    var a = $('#app');
+    if (S.vista === 'stato') a.innerHTML = vStato();
+    else if (S.vista === 'pren') a.innerHTML = vPren();
+    else if (S.vista === 'temp') a.innerHTML = vTemp();
+    else a.innerHTML = vStorico();
+  }
+  function vStato() {
+    var oggi = new Date().getDate();
+    return '<div class="wrap"><div class="forni">' + tabs().map(function (t) {
+      var s = statoDi(t), st = STATI[s.stato] || STATI.libero, mis = misura(t), pr = prenotazioni(t, oggi);
+      var h = '<article class="forno" style="--fc:' + colForno(t) + '"><div class="fh"><b>' + X.esc(nomeForno(t).toUpperCase()) + '</b><small>' + (mis ? X.esc(mis.dim + ' · ' + mis.max) : '') + '</small></div><div class="fb">' +
+        '<div class="st" style="--sc:' + st.c + '"><span class="pall' + (s.stato === 'cottura' ? ' pulse' : '') + '"></span><b>' + st.nome + '</b></div>';
+      if (s.stato !== 'libero' && s.quando) h += '<div class="timer">' + durata(s.quando) + '<span class="muted" style="font-size:16px;font-weight:700"> ore:min</span></div>';
+      var det = [];
+      if (s.operatore) det.push('<b>' + X.esc(s.operatore) + '</b>');
+      if (s.quando) det.push('dalle ' + X.ora(s.quando) + (s.quando.slice(0, 10) !== X.oggi() ? ' del ' + s.quando.slice(8, 10) + '/' + s.quando.slice(5, 7) : ''));
+      if (s.temperatura) det.push(X.esc(s.temperatura));
+      if (s.pezzi) det.push(X.esc(s.pezzi));
+      if (det.length) h += '<div class="det">' + det.join(' · ') + (s.note ? '<br>' + X.esc(s.note) : '') + '</div>';
+      h += '<div class="fa">' + azioni(t, s.stato) + '</div>';
+      h += '<div class="oggi"><b>Oggi</b>' + (pr.righe.length ? pr.righe.map(function (r) { return '<div class="r"><span>' + X.esc(r[0] || '—') + (r[4] ? ' <span class="badge ara">da inviare</span>' : '') + '</span><span class="muted">' + X.esc([r[1], r[2]].filter(String).join(' · ')) + '</span></div>'; }).join('') : '<div class="muted">Nessuna prenotazione</div>') + '</div>';
+      return h + '</div></article>';
+    }).join('') + '</div></div>';
+  }
+  function azioni(t, stato) {
+    var b = function (cls, act, txt, full) { return '<button class="btn ' + cls + (full ? ' full' : '') + '" data-act="' + act + '" data-f="' + X.esc(t) + '">' + txt + '</button>'; };
+    if (stato === 'libero') return b('prim big', 'carica', 'Carica il forno', true) + b('lin', 'pren', 'Prenota') + b('lin', 'paga', 'Incassa infornata');
+    if (stato === 'carico') return b('ros big', 'cottura', 'Avvia cottura', true) + b('lin', 'libera', 'Annulla carico') + b('lin', 'problema', 'Problema');
+    if (stato === 'cottura') return b('blu big', 'raffredda', 'Fine cottura', true) + b('lin', 'problema', 'Problema', true);
+    if (stato === 'raffreddamento') return b('ver big', 'scarica', 'Scaricato, forno libero', true) + b('lin', 'paga', 'Incassa infornata') + b('lin', 'problema', 'Problema');
+    return b('ver big', 'libera', 'Risolto, forno libero', true) + b('lin', 'nota', 'Aggiungi nota', true);
+  }
+  function giorniMese() {
+    var d = new Date(), fine = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(), out = [];
+    for (var i = d.getDate(); i <= fine; i++) out.push(i);
+    return out;
+  }
+  function vPren() {
+    var gs = giorniMese(), oggi = new Date(), nomi = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+    if (gs.indexOf(S.giorno) < 0) S.giorno = gs[0];
+    var h = '<div class="wrap"><div class="giorni">' + gs.map(function (g) {
+      var dt = new Date(oggi.getFullYear(), oggi.getMonth(), g);
+      return '<button class="gg' + (g === S.giorno ? ' on' : '') + '" data-gg="' + g + '"><small>' + (g === oggi.getDate() ? 'oggi' : nomi[dt.getDay()]) + '</small><b>' + g + '</b></button>';
+    }).join('') + '</div><div class="pren">';
+    h += tabs().map(function (t) {
+      var p = prenotazioni(t, S.giorno);
+      var c = '<div class="card" style="border-top:6px solid ' + colForno(t) + '"><h3>' + X.esc(nomeForno(t)) + '</h3>';
+      if (!p.esiste) c += '<div class="muted">Giorno non presente nel foglio di questo mese.</div>';
+      c += p.righe.map(function (r) { return '<div class="slot"><div class="d"><b>' + X.esc(r[0] || '—') + '</b>' + (r[4] ? ' <span class="badge ara">da inviare</span>' : '') + '<small>' + X.esc([r[1], r[2], r[3]].filter(String).join(' · ')) + '</small></div></div>'; }).join('');
+      if (p.esiste && !p.righe.length) c += '<div class="muted" style="padding:8px 0">Libero tutto il giorno.</div>';
+      if (p.esiste) c += (p.libere > 0 ? '<button class="btn prim full" style="margin-top:10px" data-act="pren" data-f="' + X.esc(t) + '">Prenota (' + p.libere + (p.libere === 1 ? ' posto' : ' posti') + ')</button>' : '<div class="badge ros" style="margin-top:10px">Pieno</div>');
+      return c + '</div>';
+    }).join('');
+    return h + '</div><p class="muted" style="font-size:14px">Le prenotazioni finiscono nel foglio PRENOTAZIONI FORNI/TORNI, come quelle fatte dal gestionale.</p></div>';
+  }
+  function vTemp() {
+    var i = info(), m = i.misure;
+    var h = '<div class="wrap"><div class="card"><h2>Temperature di cottura</h2>';
+    h += i.temp.length ? '<table class="tbl"><tr><th>Temp.</th><th>Per cosa</th></tr>' + i.temp.map(function (r) { return '<tr><td>' + X.esc(r.t) + '</td><td>' + X.esc(r.m) + '</td></tr>'; }).join('') + '</table>' : '<div class="vuota">La tabella arriva dal foglio dei forni appena c\'è rete.</div>';
+    var ks = Object.keys(m);
+    if (ks.length) h += '<h2 style="margin-top:20px">I forni</h2><table class="tbl"><tr><th>Forno</th><th>Misure</th><th>Massima</th></tr>' + ks.map(function (k) { return '<tr><td style="color:' + colForno(k) + '">' + X.esc(k) + '</td><td>' + X.esc(m[k].dim) + '</td><td>' + X.esc(m[k].max) + '</td></tr>'; }).join('') + '</table>';
+    return h + '</div></div>';
+  }
+  function vStorico() {
+    var srv = (S.srv && S.srv.forni && S.srv.forni.storico) || [], ids = {}, lista = [];
+    var inCoda = X.coda().map(function (c) { return c.id; });
+    locali().forEach(function (e) { if (inCoda.indexOf(e.id) >= 0) { lista.push(e); ids[e.id] = 1; } });
+    srv.forEach(function (e) { if (!ids[e.id]) lista.push(e); });
+    lista.sort(function (a, b) { return String(b.quando) < String(a.quando) ? -1 : 1; });
+    var h = '<div class="wrap"><div class="card"><h2>Ultimi movimenti</h2>';
+    if (!lista.length) h += '<div class="vuota">Ancora nessun movimento registrato.</div>';
+    h += lista.slice(0, 60).map(function (e) {
+      var st = STATI[e.stato || (e.tipo === 'prenotazione' ? 'prenotato' : e.tipo === 'incasso' ? 'pagato' : '')] || {nome: e.stato || e.tipo, c: '#4f4a42'};
+      var extra = e.tipo === 'prenotazione' ? 'giorno ' + e.giorno + ' · ' + (e.artista || '') : e.tipo === 'incasso' ? X.euro(e.importo) + ' · ' + (e.causale || '') : [e.temperatura, e.pezzi, e.note].filter(Boolean).join(' · ');
+      return '<div class="ev" style="--sc:' + st.c + '"><span class="dot"></span><div class="d"><b>' + X.esc(nomeForno(e.forno || '')) + ' · ' + X.esc(st.nome) + '</b>' + (inCoda.indexOf(e.id) >= 0 ? ' <span class="badge ara">da inviare</span>' : '') +
+        '<small>' + X.esc(String(e.quando).slice(8, 10) + '/' + String(e.quando).slice(5, 7) + ' ' + X.ora(e.quando)) + ' · ' + X.esc(e.operatore || '') + (extra ? ' · ' + X.esc(extra) : '') + '</small></div></div>';
+    }).join('');
+    var err = X.errori();
+    if (err.length) h += '<h3 style="margin-top:18px;color:var(--rosso)">Da controllare</h3>' + err.slice(0, 10).map(function (e) { return '<div class="muted">' + X.esc(e.tipo + ' · ' + (e.forno || '') + ' · ' + e.errore) + '</div>'; }).join('') + '<button class="btn lin" data-act="pulisciErr" style="margin-top:8px">Ho visto, nascondi</button>';
+    return h + '</div></div>';
+  }
+
+  /* ---------- finestre e azioni ---------- */
+  function apri(titolo, corpo) {
+    dlg.innerHTML = '<div class="dlg-h"><h2>' + titolo + '</h2><button class="dlg-x" data-act="x" aria-label="Chiudi">×</button></div><div class="dlg-b">' + corpo + '</div>';
+    if (!dlg.open) dlg.showModal();
+  }
+  function chiudiDlg() { if (dlg.open) dlg.close(); }
+  function scelteTemp(sel, nome) {
+    var t = info().temp.map(function (r) { return r.t; });
+    if (!t.length) t = ['980°C', '1050°C', '1250°C'];
+    return '<div class="scelte" data-gruppo="' + nome + '">' + t.map(function (x) { return '<button type="button" class="scelta' + (x === sel ? ' on' : '') + '" data-sc="' + X.esc(x) + '">' + X.esc(x) + '</button>'; }).join('') + '</div>';
+  }
+  function valScelta(nome) { var b = document.querySelector('[data-gruppo="' + nome + '"] .scelta.on'); return b ? b.dataset.sc : ''; }
+  function chiedi(fn) { if (!operatore()) return scegliOperatore(fn); fn(); }
+  function scegliOperatore(poi) {
+    var ops = (S.srv && S.srv.operatori) || [], op = operatore();
+    S.dopoOp = poi || null;
+    apri('Chi sei?', '<p class="muted" style="margin-top:0">Ogni movimento dei forni viene registrato con questo nome.</p><div class="scelte">' + ops.map(function (n) { return '<button class="scelta' + (n === op ? ' on' : '') + '" data-op="' + X.esc(n) + '">' + X.esc(n) + '</button>'; }).join('') + '</div>' +
+      '<label class="campo"><span>' + (ops.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" autocomplete="off" placeholder="Nome e cognome"></label><button class="btn prim full" data-act="opOk">Conferma</button>');
+  }
+  function evento(t, stato, extra) {
+    var e = {tipo: 'forno', forno: t, stato: stato, quando: X.adesso(), operatore: operatore()};
+    Object.keys(extra || {}).forEach(function (k) { e[k] = extra[k]; });
+    e = X.accoda(e);
+    var l = locali(); l.push(e); X.set('eventi', l.slice(-80));
+    chiudiDlg(); render();
+    X.toast(nomeForno(t) + ': ' + (STATI[stato] || {}).nome.toLowerCase(), 'ok');
+  }
+  function formCarica(t) {
+    var s = statoDi(t);
+    apri('Carica ' + X.esc(nomeForno(t)), '<label class="campo"><span>Di chi sono i pezzi?</span><input id="fChi" value="' + X.esc(operatore()) + '"></label>' +
+      '<label class="campo"><span>Cosa c\'è dentro</span><input id="fPezzi" placeholder="es. 12 tazze biscotto, 2 piatti smaltati"></label>' +
+      '<div class="campo"><span>Temperatura prevista</span>' + scelteTemp(s.temperatura || '', 'temp') + '</div>' +
+      '<label class="campo"><span>Note</span><input id="fNote" placeholder="facoltative"></label>' +
+      '<div class="azioni"><button class="btn lin" data-act="confCarica" data-f="' + X.esc(t) + '" data-dopo="no">Solo caricato</button><button class="btn ros" data-act="confCarica" data-f="' + X.esc(t) + '" data-dopo="cottura">Carica e avvia</button></div>');
+  }
+  function confCarica(t, dopo) {
+    var chi = $('#fChi').value.trim(), pezzi = $('#fPezzi').value.trim(), temp = valScelta('temp'), note = $('#fNote').value.trim();
+    var det = {pezzi: pezzi.slice(0, 40), temperatura: temp, note: [chi && chi !== operatore() ? 'pezzi di ' + chi : '', note].filter(String).join(' · ').slice(0, 300)};
+    if (pezzi.length > 40) det.note = (pezzi + (det.note ? ' · ' + det.note : '')).slice(0, 300);
+    if (dopo === 'cottura') {
+      det.quando = X.adesso(new Date(Date.now() - 1000));
+      evento(t, 'carico', det);
+      evento(t, 'cottura', {temperatura: temp, pezzi: det.pezzi, note: det.note});
+    } else evento(t, 'carico', det);
+  }
+  function formCottura(t) {
+    var s = statoDi(t);
+    apri('Avvia cottura · ' + X.esc(nomeForno(t)), '<div class="campo"><span>Temperatura</span>' + scelteTemp(s.temperatura || '', 'temp') + '</div><label class="campo"><span>Note</span><input id="fNote" placeholder="es. programma 3, rampa lenta"></label>' +
+      '<button class="btn ros big full" data-act="confCottura" data-f="' + X.esc(t) + '">Avvia cottura</button>');
+  }
+  function formPren(t) {
+    var gs = giorniMese(); if (gs.indexOf(S.giorno) < 0) S.giorno = gs[0];
+    apri('Prenota ' + X.esc(nomeForno(t)), '<label class="campo"><span>Giorno</span><select id="pG">' + gs.map(function (g) { return '<option value="' + g + '"' + (g === S.giorno ? ' selected' : '') + '>' + g + (g === new Date().getDate() ? ' (oggi)' : '') + '</option>'; }).join('') + '</select></label>' +
+      '<label class="campo"><span>Artista / socio</span><input id="pA" value="' + X.esc(operatore()) + '"></label>' +
+      '<label class="campo"><span>Quantità</span><input id="pQ" placeholder="es. mezzo forno, 10 pezzi"></label>' +
+      '<div class="campo"><span>Temperatura</span>' + scelteTemp('', 'ptemp') + '</div>' +
+      '<label class="campo"><span>Note</span><input id="pN" placeholder="facoltative"></label>' +
+      '<button class="btn prim big full" data-act="confPren" data-f="' + X.esc(t) + '">Prenota</button><p class="muted" style="font-size:14px">Senza rete la prenotazione parte appena torna la connessione. Se nel frattempo il giorno si riempie, la trovi in Storico come "da controllare".</p>');
+  }
+  function formPaga(t) {
+    apri('Incassa infornata', '<label class="campo"><span>Chi paga</span><input id="iChi" placeholder="Nome"></label>' +
+      '<label class="campo"><span>Importo</span><input id="iImp" inputmode="decimal" placeholder="es. 15"></label>' +
+      '<div class="campo"><span>Metodo</span><div class="scelte" data-gruppo="met"><button class="scelta on" data-sc="contanti">Contanti</button><button class="scelta" data-sc="carta">Carta</button></div></div>' +
+      '<button class="btn ver big full" data-act="confPaga" data-f="' + X.esc(t) + '">Registra incasso</button><p class="muted" style="font-size:14px">Finisce nel Flusso di Cassa come LAB INFORNATE, con il tuo nome.</p>');
+  }
+  function formNota(t, stato, titolo) {
+    apri(titolo, '<label class="campo"><span>Cosa succede?</span><textarea id="nT" placeholder="es. la resistenza non scalda, errore E3"></textarea></label><button class="btn ' + (stato === 'problema' ? 'ros' : 'prim') + ' big full" data-act="confNota" data-f="' + X.esc(t) + '" data-st="' + stato + '">Registra</button>');
+  }
+
+  /* ---------- configurazione iniziale ---------- */
+  function setup() {
+    $('#viste').style.display = 'none';
+    $('#app').innerHTML = '<div class="setup"><div class="card"><h2>Configura questa postazione</h2><p class="muted">Apri su questo dispositivo il link della postazione Forni (dal gestionale) oppure incolla qui la chiave. Va bene anche il tuo PIN personale, se è il tuo telefono.</p>' +
+      '<label class="campo"><span>Chiave o PIN</span><input id="kIn" autocomplete="off"></label><button class="btn prim full big" data-act="setK">Collega</button></div></div>';
+  }
+  function provaChiave() {
+    var v = ($('#kIn').value || '').trim(), m = v.match(/[?&]k=([^&]+)/); if (m) v = decodeURIComponent(m[1]); if (!v) return;
+    X.salvaChiave(v);
+    var b = $('[data-act="setK"]'); b.disabled = true; b.textContent = 'Controllo…';
+    X.call('init').then(function (j) { X.set('stato', j); $('#viste').style.display = ''; S.srv = j; render(); X.toast('Postazione collegata: ' + j.postazione, 'ok'); },
+      function (e) { X.salvaChiave(''); b.disabled = false; b.textContent = 'Collega'; X.toast(e.server ? 'Chiave o PIN non valido.' : 'Serve la rete per il primo collegamento.', 'err'); });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest('button'); if (!t) return;
+    var d = t.dataset, f = d.f;
+    if (d.v) { S.vista = d.v; render(); window.scrollTo(0, 0); return; }
+    if (d.gg) { S.giorno = Number(d.gg); render(); return; }
+    if (d.sc) { [].forEach.call(t.parentNode.querySelectorAll('.scelta'), function (b) { b.classList.toggle('on', b === t); }); return; }
+    if (d.op) { [].forEach.call(document.querySelectorAll('[data-op]'), function (b) { b.classList.toggle('on', b === t); }); $('#opNome').value = ''; return; }
+    if (t.id === 'opBtn') return scegliOperatore();
+    switch (d.act) {
+      case 'x': return chiudiDlg();
+      case 'carica': return chiedi(function () { formCarica(f); });
+      case 'cottura': return chiedi(function () { formCottura(f); });
+      case 'raffredda': return chiedi(function () { evento(f, 'raffreddamento', {temperatura: statoDi(f).temperatura || ''}); });
+      case 'scarica': return chiedi(function () { evento(f, 'libero', {note: 'scaricato'}); });
+      case 'libera': return chiedi(function () { evento(f, 'libero', {note: statoDi(f).stato === 'problema' ? 'problema risolto' : 'carico annullato'}); });
+      case 'problema': return chiedi(function () { formNota(f, 'problema', 'Segnala un problema'); });
+      case 'nota': return chiedi(function () { formNota(f, 'problema', 'Aggiungi nota'); });
+      case 'pren': return chiedi(function () { formPren(f); });
+      case 'paga': return chiedi(function () { formPaga(f); });
+      case 'confCarica': return confCarica(f, d.dopo);
+      case 'confCottura': return evento(f, 'cottura', {temperatura: valScelta('temp'), note: $('#fNote').value.trim().slice(0, 300), pezzi: statoDi(f).pezzi || ''});
+      case 'confNota': { var n = $('#nT').value.trim(); if (!n) return X.toast('Scrivi due parole su cosa succede.', 'err'); return evento(f, d.st, {note: n.slice(0, 300)}); }
+      case 'confPren': {
+        var a = $('#pA').value.trim(); if (!a) return X.toast('Scrivi il nome di chi prenota.', 'err');
+        var g = Number($('#pG').value);
+        var e = X.accoda({tipo: 'prenotazione', forno: f, giorno: g, artista: a.slice(0, 120), quantita: $('#pQ').value.trim().slice(0, 120), temperatura: valScelta('ptemp'), note: $('#pN').value.trim().slice(0, 300), quando: X.adesso(), operatore: operatore()});
+        var l = locali(); l.push(e); X.set('eventi', l.slice(-80)); S.giorno = g; chiudiDlg(); render(); X.toast('Prenotato ' + nomeForno(f) + ' il ' + g, 'ok'); return;
+      }
+      case 'confPaga': {
+        var imp = Number(($('#iImp').value || '').replace(',', '.')); if (!(imp > 0)) return X.toast('Importo non valido.', 'err');
+        var chi = $('#iChi').value.trim(); if (!chi) return X.toast('Scrivi chi paga.', 'err');
+        var p = X.accoda({tipo: 'incasso', forno: f, importo: Math.round(imp * 100) / 100, metodo: valScelta('met') || 'contanti', data: X.oggi(), causale: 'Infornata ' + chi + ' · ' + nomeForno(f), cassa: 'LAB INFORNATE', quando: X.adesso(), operatore: operatore()});
+        var l2 = locali(); l2.push(p); X.set('eventi', l2.slice(-80)); chiudiDlg(); render(); X.toast('Incasso registrato · ' + X.euro(p.importo), 'ok'); return;
+      }
+      case 'pulisciErr': X.set('errori', []); X.aggiornaStato(); return render();
+      case 'setK': return provaChiave();
+      case 'opOk': {
+        var sel = document.querySelector('[data-op].on'), nome = ($('#opNome').value || '').trim() || (sel ? sel.dataset.op : '');
+        if (!nome) return X.toast('Scegli o scrivi un nome.', 'err');
+        X.set('operatore', nome.slice(0, 60)); chiudiDlg(); render(); var poi = S.dopoOp; S.dopoOp = null; if (poi) poi(); return;
+      }
+    }
+  });
+  dlg.addEventListener('click', function (ev) { if (ev.target === dlg) chiudiDlg(); });
+
+  X.avvia('forni', {
+    onStato: function (s) {
+      S.srv = s;
+      var srvIds = {}; ((s.forni && s.forni.storico) || []).forEach(function (e) { srvIds[e.id] = 1; });
+      var inCoda = X.coda().map(function (c) { return c.id; });
+      X.set('eventi', locali().filter(function (e) { return inCoda.indexOf(e.id) >= 0 || !srvIds[e.id]; }).slice(-80));
+      if (!dlg.open) render();
+    },
+    onChiave: function () { X.salvaChiave(''); setup(); },
+    onTick: function () { if (!dlg.open && S.vista === 'stato') render(); }
+  });
+  if (!X.chiave()) setup(); else { S.srv = X.stato(); render(); }
+  setInterval(function () { if (!dlg.open && S.vista === 'stato') render(); }, 30000);
+})();
+</script>
+</body>
+</html>

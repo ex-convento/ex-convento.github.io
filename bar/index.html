@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bar · Ex Convento</title>
+<meta name="theme-color" content="#0d0b09">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bar Ex Convento">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Josefin+Sans:wght@600;700&display=swap">
+<link rel="stylesheet" href="../comune.css">
+<style>
+  body{display:flex;flex-direction:column;min-height:100dvh}
+  .main{flex:1;display:flex;min-height:0}
+  .prod{flex:1;padding:16px;overflow:auto}
+  .griglia{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .p{position:relative;background:var(--sup);border-radius:var(--r);box-shadow:var(--ombra);min-height:110px;padding:14px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;border-top:6px solid var(--c,var(--ambra));transition:transform .08s}
+  .p:active{transform:scale(.96)}
+  .p .n{font-weight:700;font-size:18px;line-height:1.2}
+  .p .pr{font:700 20px/1 var(--display);color:var(--muted)}
+  .p .q{position:absolute;top:10px;right:10px;min-width:32px;height:32px;border-radius:16px;background:var(--nero);color:var(--ambra);font-weight:700;display:grid;place-items:center;padding:0 8px}
+  .p.flash{animation:fl .3s}
+  @keyframes fl{50%{transform:scale(.94)}}
+  .avviso{background:var(--ocra-soft);color:var(--ocra);border-radius:var(--r-sm);padding:10px 14px;font-weight:700;margin-bottom:12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+
+  .scontrino{width:380px;flex:none;background:var(--sup);border-left:1px solid var(--linea);display:flex;flex-direction:column;min-height:0}
+  .sc-h{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px}
+  .righe{flex:1;overflow:auto;padding:0 12px}
+  .riga{display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid var(--linea)}
+  .riga .nm{flex:1;font-weight:700;line-height:1.2}
+  .riga .nm small{display:block;font-weight:400;color:var(--muted)}
+  .qbtn{width:44px;height:44px;border-radius:50%;background:var(--sup2);font-size:22px;font-weight:700}
+  .riga .qq{min-width:26px;text-align:center;font-weight:700;font-size:18px}
+  .riga .tt{min-width:76px;text-align:right;font-weight:700}
+  .tot{padding:14px 18px;border-top:2px solid var(--linea)}
+  .tot .cifra{display:flex;justify-content:space-between;align-items:baseline;font:700 34px/1 var(--display);margin-bottom:12px}
+  .tot .cifra span:first-child{font-size:18px;color:var(--muted)}
+  .paga{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  .barra{display:none}
+  .inDlg .sc-h h2{visibility:hidden}
+  .inDlg .sc-h{padding-top:0}
+  @media (max-width:820px){
+    .scontrino{display:none}
+    .prod{padding:12px 12px 100px}
+    .griglia{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+    .p{min-height:96px}
+    .barra{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--nero);color:#fff;padding:12px 14px;padding-bottom:max(12px,env(safe-area-inset-bottom));gap:12px;align-items:center}
+    .barra .info{flex:1;font-weight:700}
+    .barra .info b{display:block;font:700 24px/1.1 var(--display);color:var(--ambra)}
+    .barra .btn{min-height:54px}
+  }
+  .tasti{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+  .tasti button{min-height:58px;border-radius:var(--r-sm);background:var(--sup2);font-weight:700;font-size:19px}
+  .resto{display:flex;justify-content:space-between;align-items:baseline;background:var(--verde-soft);color:var(--verde);border-radius:var(--r-sm);padding:14px 16px;font:700 26px/1 var(--display)}
+  .resto.no{background:var(--rosso-soft);color:var(--rosso)}
+  .resto span:first-child{font-size:16px}
+
+  .pann{padding:16px;max-width:900px;margin:0 auto;width:100%}
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+  .kpi .card b{display:block;font:700 28px/1.1 var(--display);margin-top:4px}
+  .lista .el{display:flex;gap:12px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--linea)}
+  .lista .el .d{flex:1;min-width:0}
+  .lista .el .d small{display:block;color:var(--muted)}
+  .lista .el.ann{opacity:.5;text-decoration:line-through}
+  .lst{width:100%;border-collapse:collapse}
+  .lst td{padding:6px 4px;vertical-align:middle}
+  .lst input,.lst select{width:100%;min-height:46px;border:2px solid var(--linea);border-radius:10px;padding:6px 10px;font:inherit;background:var(--sup)}
+  .lst .pz{width:96px}
+  @media (max-width:640px){.lst tr{display:grid;grid-template-columns:1fr 96px 44px;gap:6px;padding:8px 0;border-bottom:1px solid var(--linea)}.lst td{padding:0}.lst td.g{grid-column:1/2}.lst td.c{grid-column:2/4}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="../logo.png" alt="" width="45" height="34"><div><b>EX CONVENTO</b><small>Bar</small></div></div>
+  <div class="spazio"></div>
+  <span id="sync" class="sync">…</span>
+  <button id="opBtn" class="chip vuoto" aria-label="Chi è al banco">Chi è al banco?</button>
+</header>
+<nav class="tabs" id="viste">
+  <button class="tab on" data-v="cassa">Cassa</button>
+  <button class="tab" data-v="oggi">Oggi</button>
+  <button class="tab" data-v="chiudi">Chiudi cassa</button>
+  <button class="tab" data-v="listino">Listino</button>
+</nav>
+<div id="app" class="main"></div>
+<div class="barra" id="barra"></div>
+<dialog id="dlg"></dialog>
+
+<script src="../comune.js"></script>
+<script>
+(function () {
+  'use strict';
+  var X = window.EXC, $ = function (s, r) { return (r || document).querySelector(s); };
+  var COL = ['#FEA501', '#2f6f9a', '#1b7a4a', '#b33f28', '#94660a', '#7d4f9a', '#4f4a42', '#2f8f8a'];
+  var S = {vista: 'cassa', gruppo: 'Tutti', carrello: [], listino: [], esempio: false, operatori: [], postazione: ''};
+  var dlg = $('#dlg');
+
+  function vendite() { return X.get('vendite', []); }
+  function salvaVendite(v) { var lim = X.oggi(new Date(Date.now() - 21 * 864e5)); X.set('vendite', v.filter(function (x) { return !x.chiusa || x.data >= lim; }).slice(-3000)); }
+  function operatore() { return X.get('operatore', ''); }
+
+  /* ---------- dati dal gestionale ---------- */
+  function suStato(s) {
+    if (s.listino) { S.listino = (s.listino.prodotti || []).filter(function (p) { return !p.nascosto; }); S.listinoTutto = s.listino.prodotti || []; S.esempio = !!s.listino.esempio; }
+    S.operatori = s.operatori || [];
+    S.postazione = s.postazione || '';
+    if (S.vista === 'cassa' || S.vista === 'listino') render();
+  }
+
+  /* ---------- carrello ---------- */
+  function totale() { return Math.round(S.carrello.reduce(function (s, r) { return s + r.q * r.prezzo; }, 0) * 100) / 100; }
+  function pezzi() { return S.carrello.reduce(function (s, r) { return s + r.q; }, 0); }
+  function aggiungi(id) {
+    var p = S.listino.filter(function (x) { return x.id === id; })[0]; if (!p) return;
+    var r = S.carrello.filter(function (x) { return x.id === id; })[0];
+    if (r) r.q++; else S.carrello.push({id: p.id, nome: p.nome, prezzo: Number(p.prezzo), cassa: p.cassa || 'BAR', q: 1});
+    if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) {}
+    render(); var b = document.querySelector('.p[data-id="' + CSS.escape(id) + '"]'); if (b) b.classList.add('flash');
+  }
+  function cambiaQ(id, d) {
+    var r = S.carrello.filter(function (x) { return x.id === id; })[0]; if (!r) return;
+    r.q += d; if (r.q <= 0) S.carrello = S.carrello.filter(function (x) { return x !== r; });
+    render(); if (dlg.open && dlg.dataset.k === 'scontrino') apriScontrino();
+  }
+
+  /* ---------- viste ---------- */
+  function render() {
+    document.querySelectorAll('#viste .tab').forEach(function (t) { t.classList.toggle('on', t.dataset.v === S.vista); });
+    var op = operatore(), ob = $('#opBtn');
+    ob.innerHTML = op ? '<span class="lbl">Al banco: </span>' + X.esc(op) : 'Chi è al banco?'; ob.classList.toggle('vuoto', !op);
+    var a = $('#app');
+    $('#barra').style.display = S.vista === 'cassa' && window.matchMedia('(max-width:820px)').matches ? 'flex' : 'none';
+    if (S.vista === 'cassa') a.innerHTML = vCassa();
+    else if (S.vista === 'oggi') a.innerHTML = vOggi();
+    else if (S.vista === 'chiudi') a.innerHTML = vChiudi();
+    else a.innerHTML = vListino();
+    if (S.vista === 'cassa') $('#barra').innerHTML = S.carrello.length
+      ? '<div class="info">' + pezzi() + (pezzi() === 1 ? ' articolo' : ' articoli') + '<b>' + X.euro(totale()) + '</b></div><button class="btn amb" data-act="scontrino">Incassa ›</button>'
+      : '<div class="info muted" style="color:#cfc6b6">Tocca i prodotti per aggiungerli</div>';
+  }
+  function gruppi() { var g = []; S.listino.forEach(function (p) { if (g.indexOf(p.gruppo) < 0) g.push(p.gruppo); }); return g; }
+  function colore(g) { var i = gruppi().indexOf(g); return COL[(i < 0 ? 0 : i) % COL.length]; }
+
+  function vCassa() {
+    var gs = gruppi(), h = '<section class="prod">';
+    if (S.esempio) h += '<div class="avviso">Prodotti e prezzi di esempio: aggiorna il listino prima di usare la cassa. <button class="btn amb" data-v-go="listino" style="min-height:42px">Apri listino</button></div>';
+    if (!S.listino.length) h += '<div class="card vuota">Il listino non è ancora arrivato. Serve un attimo di rete la prima volta.</div>';
+    if (gs.length > 1) h += '<div class="scelte" style="margin-bottom:12px">' + ['Tutti'].concat(gs).map(function (g) { return '<button class="scelta' + (S.gruppo === g ? ' on' : '') + '" data-g="' + X.esc(g) + '">' + X.esc(g) + '</button>'; }).join('') + '</div>';
+    h += '<div class="griglia">' + S.listino.filter(function (p) { return S.gruppo === 'Tutti' || p.gruppo === S.gruppo; }).map(function (p) {
+      var r = S.carrello.filter(function (x) { return x.id === p.id; })[0];
+      return '<button class="p" data-id="' + X.esc(p.id) + '" style="--c:' + colore(p.gruppo) + '">' + (r ? '<span class="q">' + r.q + '</span>' : '') +
+        '<span class="n">' + X.esc(p.nome) + '</span><span class="pr">' + X.euro(p.prezzo) + '</span></button>';
+    }).join('') + '</div></section>';
+    h += '<aside class="scontrino">' + scontrinoHtml() + '</aside>';
+    return h;
+  }
+  function scontrinoHtml() {
+    var h = '<div class="sc-h"><h2 style="margin:0">Scontrino</h2>' + (S.carrello.length ? '<button class="btn lin" data-act="svuota" style="min-height:40px;padding:0 12px">Svuota</button>' : '') + '</div><div class="righe">';
+    if (!S.carrello.length) h += '<div class="vuota">Tocca i prodotti a sinistra per aggiungerli.</div>';
+    h += S.carrello.map(function (r) {
+      return '<div class="riga"><div class="nm">' + X.esc(r.nome) + '<small>' + X.euro(r.prezzo) + '</small></div>' +
+        '<button class="qbtn" data-q="-1" data-id="' + X.esc(r.id) + '" aria-label="Togli">−</button><span class="qq">' + r.q + '</span>' +
+        '<button class="qbtn" data-q="1" data-id="' + X.esc(r.id) + '" aria-label="Aggiungi">+</button><span class="tt">' + X.euro(r.q * r.prezzo) + '</span></div>';
+    }).join('');
+    h += '</div><div class="tot"><div class="cifra"><span>Totale</span><span>' + X.euro(totale()) + '</span></div>' +
+      '<div class="paga"><button class="btn ver big" data-pay="contanti"' + (S.carrello.length ? '' : ' disabled') + '>Contanti</button>' +
+      '<button class="btn blu big" data-pay="carta"' + (S.carrello.length ? '' : ' disabled') + '>Carta</button></div></div>';
+    return h;
+  }
+
+  function aperte() { return vendite().filter(function (v) { return !v.chiusa; }); }
+  function somme(lista) {
+    var o = {n: 0, contanti: 0, carta: 0, tot: 0, prodotti: {}};
+    lista.forEach(function (v) {
+      if (v.totale > 0) o.n++;
+      o[v.metodo === 'carta' ? 'carta' : 'contanti'] += v.totale; o.tot += v.totale;
+      v.righe.forEach(function (r) { o.prodotti[r.nome] = (o.prodotti[r.nome] || 0) + r.q; });
+    });
+    ['contanti', 'carta', 'tot'].forEach(function (n) { o[n] = Math.round(o[n] * 100) / 100; });
+    return o;
+  }
+  function vOggi() {
+    var oggi = X.oggi(), lista = vendite().filter(function (v) { return v.data === oggi; }), s = somme(lista);
+    var top = Object.keys(s.prodotti).map(function (n) { return [n, s.prodotti[n]]; }).filter(function (x) { return x[1] > 0; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 6);
+    var h = '<section class="pann"><h2>Oggi su questo dispositivo</h2><div class="kpi">' +
+      '<div class="card"><span class="muted">Incassato</span><b>' + X.euro(s.tot) + '</b></div>' +
+      '<div class="card"><span class="muted">Contanti</span><b>' + X.euro(s.contanti) + '</b></div>' +
+      '<div class="card"><span class="muted">Carta</span><b>' + X.euro(s.carta) + '</b></div>' +
+      '<div class="card"><span class="muted">Scontrini</span><b>' + s.n + '</b></div></div>';
+    if (top.length) h += '<div class="card" style="margin-bottom:14px"><h3>Più venduti</h3>' + top.map(function (t) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--linea)"><span>' + X.esc(t[0]) + '</span><b>' + t[1] + '</b></div>'; }).join('') + '</div>';
+    var err = X.errori();
+    if (err.length) h += '<div class="card" style="margin-bottom:14px;border:2px solid var(--rosso)"><h3>Da controllare (' + err.length + ')</h3>' + err.slice(0, 10).map(function (e) { return '<div class="muted" style="padding:4px 0">' + X.esc(e.tipo) + ' · ' + X.esc(e.errore) + '</div>'; }).join('') + '<button class="btn lin" data-act="pulisciErr" style="margin-top:8px">Ho visto, nascondi</button></div>';
+    h += '<div class="card"><h3>Scontrini</h3><div class="lista">';
+    if (!lista.length) h += '<div class="vuota">Ancora nessuna vendita oggi.</div>';
+    var coda = X.coda().map(function (c) { return c.id; });
+    h += lista.slice().reverse().map(function (v) {
+      var annullabile = !v.chiusa && v.totale > 0 && !v.annullata;
+      return '<div class="el' + (v.annullata ? ' ann' : '') + '"><div class="d"><b>' + X.esc(v.righe.map(function (r) { return r.q + '× ' + r.nome; }).join(', ')) + '</b>' +
+        '<small>' + X.ora(v.quando) + ' · ' + (v.metodo === 'carta' ? 'carta' : 'contanti') + ' · ' + X.esc(v.operatore || '') +
+        (coda.indexOf(v.id) >= 0 ? ' · <span class="badge ara">da inviare</span>' : ' · <span class="badge ver">salvato</span>') + (v.chiusa ? ' · chiusa' : '') + '</small></div>' +
+        '<b>' + X.euro(v.totale) + '</b>' + (annullabile ? '<button class="btn lin" data-ann="' + v.id + '" style="min-height:42px;padding:0 12px">Annulla</button>' : '') + '</div>';
+    }).join('');
+    return h + '</div></div></section>';
+  }
+  function vChiudi() {
+    var lista = aperte(), s = somme(lista);
+    var giorni = lista.map(function (v) { return v.data; }).filter(function (d, i, a) { return a.indexOf(d) === i; }).sort();
+    var h = '<section class="pann"><h2>Chiusura cassa</h2><p class="muted" style="margin-top:0">Vendite non ancora chiuse su questo dispositivo' + (giorni.length ? ' (' + giorni.map(function (d) { return d.slice(8) + '/' + d.slice(5, 7); }).join(', ') + ')' : '') + '. Alla chiusura il gestionale scrive gli incassi nel Flusso di Cassa, divisi per categoria e metodo.</p>' +
+      '<div class="kpi"><div class="card"><span class="muted">Contanti attesi</span><b>' + X.euro(s.contanti) + '</b></div>' +
+      '<div class="card"><span class="muted">Carta</span><b>' + X.euro(s.carta) + '</b></div>' +
+      '<div class="card"><span class="muted">Scontrini</span><b>' + s.n + '</b></div></div>';
+    if (!lista.length) return h + '<div class="card vuota">Niente da chiudere: nessuna vendita aperta.</div></section>';
+    h += '<div class="card"><label class="campo"><span>Contanti contati nel cassetto (facoltativo)</span><input id="contati" inputmode="decimal" placeholder="es. ' + s.contanti.toFixed(2).replace('.', ',') + '"></label>' +
+      '<div id="diff" class="muted" style="font-weight:700;min-height:22px"></div>' +
+      '<label class="campo"><span>Note (facoltative)</span><input id="noteCh" placeholder="es. serata jazz, fondo cassa 50 €"></label>' +
+      '<button class="btn prim big full" data-act="chiudi">Chiudi la cassa e invia</button>' +
+      '<p class="muted" style="font-size:14px;margin-bottom:0">Funziona anche senza rete: la chiusura parte appena c\'è connessione.</p></div>';
+    var ch = X.get('chiusure', []);
+    if (ch.length) h += '<div class="card" style="margin-top:14px"><h3>Ultime chiusure</h3>' + ch.slice(-8).reverse().map(function (c) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--linea)"><span>' + c.data.slice(8) + '/' + c.data.slice(5, 7) + ' · ' + X.esc(c.operatore) + '</span><b>' + X.euro(c.totale) + '</b></div>'; }).join('') + '</div>';
+    return h + '</section>';
+  }
+  function vListino() {
+    var l = S.listinoTutto || [];
+    var h = '<section class="pann"><h2>Listino</h2><p class="muted" style="margin-top:0">Per salvare serve il PIN personale di un membro del direttivo e un po\' di rete. "Cassa" è la categoria del Flusso di Cassa in cui finisce l\'incasso (BAR, CONTRIBUTO, LAB TICKETS, EVENTI…).</p><div class="card"><table class="lst"><tbody id="lstBody">' +
+      l.map(rigaListino).join('') + '</tbody></table><button class="btn lin full" data-act="addProd" style="margin-top:10px">+ Aggiungi prodotto</button></div>' +
+      '<div class="azioni"><button class="btn prim big" data-act="salvaListino">Salva listino</button></div></section>';
+    return h;
+  }
+  function rigaListino(p) {
+    p = p || {id: '', nome: '', prezzo: '', gruppo: 'Bevande', cassa: 'BAR'};
+    return '<tr data-id="' + X.esc(p.id) + '"><td><input class="ln" placeholder="Nome" value="' + X.esc(p.nome) + '"></td>' +
+      '<td class="pz"><input class="lp" inputmode="decimal" placeholder="€" value="' + (p.prezzo === '' ? '' : String(p.prezzo).replace('.', ',')) + '"></td>' +
+      '<td><button class="qbtn" data-act="delProd" aria-label="Elimina">×</button></td>' +
+      '<td class="g"><input class="lg" placeholder="Gruppo" value="' + X.esc(p.gruppo) + '"></td>' +
+      '<td class="c"><input class="lc" placeholder="Cassa" value="' + X.esc(p.cassa || 'BAR') + '"></td></tr>';
+  }
+
+  /* ---------- finestre ---------- */
+  function apri(k, titolo, corpo) {
+    dlg.dataset.k = k;
+    dlg.innerHTML = '<div class="dlg-h"><h2>' + titolo + '</h2><button class="dlg-x" data-act="x" aria-label="Chiudi">×</button></div><div class="dlg-b">' + corpo + '</div>';
+    if (!dlg.open) dlg.showModal();
+  }
+  function chiudiDlg() { if (dlg.open) dlg.close(); }
+  function apriScontrino() { if (!S.carrello.length) return chiudiDlg(); apri('scontrino', 'Scontrino', '<div class="inDlg" style="margin:0 -12px">' + scontrinoHtml() + '</div>'); }
+  function scegliOperatore(poi) {
+    var op = operatore();
+    var h = '<p class="muted" style="margin-top:0">Ogni vendita viene registrata con questo nome.</p><div class="scelte">' +
+      S.operatori.map(function (n) { return '<button class="scelta' + (n === op ? ' on' : '') + '" data-op="' + X.esc(n) + '">' + X.esc(n) + '</button>'; }).join('') + '</div>' +
+      '<label class="campo"><span>' + (S.operatori.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" placeholder="Nome e cognome" autocomplete="off"></label>' +
+      '<button class="btn prim full" data-act="opOk">Conferma</button>';
+    S.dopoOp = poi || null;
+    apri('operatore', 'Chi è al banco?', h);
+  }
+  function paga(metodo) {
+    if (!S.carrello.length) return;
+    if (!operatore()) return scegliOperatore(function () { paga(metodo); });
+    if (metodo === 'carta') {
+      apri('carta', 'Pagamento con carta', '<div class="resto"><span>Da incassare col POS</span><span>' + X.euro(totale()) + '</span></div><p class="muted">Conferma solo dopo che il pagamento sul POS è andato a buon fine.</p><div class="azioni"><button class="btn lin" data-act="x">Indietro</button><button class="btn blu big" data-act="confCarta">Pagato con carta</button></div>');
+      return;
+    }
+    S.ricevuto = '';
+    var t = totale(), tagli = [5, 10, 20, 50].filter(function (x) { return x >= t; }).slice(0, 3);
+    apri('contanti', 'Pagamento in contanti', '<div class="resto"><span>Totale</span><span>' + X.euro(t) + '</span></div>' +
+      '<p class="muted" style="margin:12px 0 6px">Quanto ti hanno dato?</p><div class="scelte"><button class="scelta" data-ric="' + t + '">Esatto</button>' +
+      tagli.map(function (x) { return '<button class="scelta" data-ric="' + x + '">' + x + ' €</button>'; }).join('') + '</div>' +
+      '<div class="tasti">' + ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'].map(function (c) { return '<button data-tasto="' + c + '">' + c + '</button>'; }).join('') + '</div>' +
+      '<div id="resto"></div><button class="btn ver big full" data-act="confContanti" style="margin-top:12px">Conferma vendita</button>');
+    aggiornaResto();
+  }
+  function aggiornaResto() {
+    var el = $('#resto'); if (!el) return;
+    var t = totale(), r = Number(String(S.ricevuto).replace(',', '.'));
+    if (!S.ricevuto) { el.innerHTML = ''; return; }
+    var resto = Math.round((r - t) * 100) / 100;
+    el.innerHTML = '<div class="resto' + (resto < 0 ? ' no' : '') + '"><span>Ricevuti ' + X.euro(r) + ' · ' + (resto < 0 ? 'mancano' : 'resto') + '</span><span>' + X.euro(Math.abs(resto)) + '</span></div>';
+  }
+  function registraVendita(metodo) {
+    var v = {tipo: 'vendita', id: X.uuid(), quando: X.adesso(), data: X.oggi(), operatore: operatore(), metodo: metodo,
+      righe: S.carrello.map(function (r) { return {id: r.id, nome: r.nome, prezzo: r.prezzo, q: r.q, cassa: r.cassa}; }), totale: totale()};
+    var lista = vendite(); lista.push(v); salvaVendite(lista);
+    X.accoda(v);
+    S.carrello = []; chiudiDlg(); render();
+    X.toast('Venduto · ' + X.euro(v.totale) + (metodo === 'carta' ? ' con carta' : ' in contanti'), 'ok');
+  }
+  function annulla(id) {
+    var lista = vendite(), v = lista.filter(function (x) { return x.id === id; })[0];
+    if (!v || v.chiusa || v.annullata) return;
+    apri('ann', 'Annullare lo scontrino?', '<p>' + X.esc(v.righe.map(function (r) { return r.q + '× ' + r.nome; }).join(', ')) + ' · <b>' + X.euro(v.totale) + '</b></p><p class="muted">Viene registrato uno storno con il tuo nome: lo scontrino originale resta nello storico.</p><div class="azioni"><button class="btn lin" data-act="x">No</button><button class="btn ros" data-act="confAnn" data-id="' + id + '">Sì, annulla</button></div>');
+  }
+  function confermaAnnullo(id) {
+    if (!operatore()) return scegliOperatore(function () { confermaAnnullo(id); });
+    var lista = vendite(), v = lista.filter(function (x) { return x.id === id; })[0]; if (!v) return;
+    v.annullata = true;
+    var st = {tipo: 'vendita', id: X.uuid(), quando: X.adesso(), data: X.oggi(), operatore: operatore(), metodo: v.metodo, storno: v.id,
+      righe: v.righe.map(function (r) { return {id: r.id, nome: 'STORNO ' + r.nome, prezzo: r.prezzo, q: -r.q, cassa: r.cassa}; }), totale: -v.totale, annullata: true};
+    lista.push(st); salvaVendite(lista); X.accoda(st); chiudiDlg(); render();
+    X.toast('Scontrino annullato', 'ok');
+  }
+  function chiudiCassa() {
+    if (!operatore()) return scegliOperatore(chiudiCassa);
+    var lista = vendite(), aperteL = lista.filter(function (v) { return !v.chiusa; }); if (!aperteL.length) return;
+    var s = somme(aperteL), cont = ($('#contati') || {}).value || '', id = X.uuid(), oggi = X.oggi();
+    var c = {tipo: 'chiusura', id: id, quando: X.adesso(), data: oggi, operatore: operatore(), contati: cont ? Number(cont.replace(',', '.')) : '', note: (($('#noteCh') || {}).value || '').slice(0, 300)};
+    lista.forEach(function (v) { if (!v.chiusa && v.data <= oggi) v.chiusa = id; });
+    salvaVendite(lista); X.accoda(c);
+    var ch = X.get('chiusure', []); ch.push({id: id, data: oggi, operatore: c.operatore, totale: s.tot}); X.set('chiusure', ch.slice(-30));
+    render(); X.toast('Cassa chiusa · ' + X.euro(s.tot), 'ok');
+  }
+  function salvaListino() {
+    var righe = [].slice.call(document.querySelectorAll('#lstBody tr')).map(function (tr) {
+      return {id: tr.dataset.id || '', nome: $('.ln', tr).value.trim(), prezzo: $('.lp', tr).value.trim().replace(',', '.'), gruppo: $('.lg', tr).value.trim() || 'Altro', cassa: ($('.lc', tr).value.trim() || 'BAR').toUpperCase()};
+    }).filter(function (p) { return p.nome; });
+    if (!righe.length) return X.toast('Il listino è vuoto.', 'err');
+    var bad = righe.filter(function (p) { return !(Number(p.prezzo) >= 0) || p.prezzo === ''; })[0];
+    if (bad) return X.toast('Manca il prezzo di «' + bad.nome + '».', 'err');
+    S.listinoBozza = righe;
+    apri('pin', 'Conferma con il tuo PIN', '<label class="campo"><span>PIN personale (direttivo)</span><input id="pinL" type="password" inputmode="numeric" autocomplete="off"></label><button class="btn prim full" data-act="confListino">Salva listino</button>');
+    setTimeout(function () { var i = $('#pinL'); if (i) i.focus(); }, 50);
+  }
+  function confermaListino() {
+    var pin = ($('#pinL') || {}).value || ''; if (!pin) return;
+    var b = $('[data-act="confListino"]'); if (b) { b.disabled = true; b.textContent = 'Salvo…'; }
+    X.call('listino', {pin: pin, listino: S.listinoBozza}).then(function (j) {
+      X.set('stato', j); suStato(j); chiudiDlg(); S.vista = 'cassa'; render(); X.toast('Listino salvato', 'ok');
+    }, function (e) {
+      if (b) { b.disabled = false; b.textContent = 'Salva listino'; }
+      X.toast(e.server ? e.message : 'Serve la rete per salvare il listino. Riprova tra poco.', 'err');
+    });
+  }
+
+  /* ---------- configurazione iniziale ---------- */
+  function setup() {
+    $('#viste').style.display = 'none'; $('#barra').style.display = 'none';
+    $('#app').innerHTML = '<div class="setup"><div class="card"><h2>Configura questa postazione</h2>' +
+      '<p class="muted">Apri su questo dispositivo il link della postazione Bar (lo trovi nel gestionale, scheda Accessi) oppure incolla qui la chiave. Va bene anche il tuo PIN personale, se è il tuo telefono.</p>' +
+      '<label class="campo"><span>Chiave o PIN</span><input id="kIn" autocomplete="off"></label><button class="btn prim full big" data-act="setK">Collega</button></div></div>';
+  }
+  function provaChiave() {
+    var v = ($('#kIn') || {}).value || ''; v = v.trim(); var m = v.match(/[?&]k=([^&]+)/); if (m) v = decodeURIComponent(m[1]);
+    if (!v) return;
+    X.salvaChiave(v);
+    var b = $('[data-act="setK"]'); if (b) { b.disabled = true; b.textContent = 'Controllo…'; }
+    X.call('init').then(function (j) {
+      X.set('stato', j); $('#viste').style.display = ''; suStato(j); render(); X.toast('Postazione collegata: ' + j.postazione, 'ok'); X.sync(true);
+    }, function (e) {
+      X.salvaChiave(''); if (b) { b.disabled = false; b.textContent = 'Collega'; }
+      X.toast(e.server ? 'Chiave o PIN non valido.' : 'Serve la rete per il primo collegamento.', 'err');
+    });
+  }
+
+  /* ---------- eventi ---------- */
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest('button'); if (!t) return;
+    var d = t.dataset;
+    if (d.v) { S.vista = d.v; chiudiDlg(); render(); window.scrollTo(0, 0); return; }
+    if (d.vGo) { S.vista = d.vGo; render(); return; }
+    if (d.g) { S.gruppo = d.g; render(); return; }
+    if (d.id && t.classList.contains('p')) return aggiungi(d.id);
+    if (d.q) return cambiaQ(d.id, Number(d.q));
+    if (d.pay) return paga(d.pay);
+    if (d.ann) return annulla(d.ann);
+    if (d.op) { [].forEach.call(document.querySelectorAll('[data-op]'), function (b) { b.classList.toggle('on', b === t); }); $('#opNome').value = ''; return; }
+    if (d.ric) { S.ricevuto = String(d.ric).replace('.', ','); aggiornaResto(); return; }
+    if (d.tasto) {
+      if (d.tasto === '⌫') S.ricevuto = S.ricevuto.slice(0, -1);
+      else if (!(d.tasto === ',' && S.ricevuto.indexOf(',') >= 0) && S.ricevuto.length < 7) S.ricevuto += d.tasto;
+      aggiornaResto(); return;
+    }
+    if (t.id === 'opBtn') return scegliOperatore();
+    switch (d.act) {
+      case 'x': return chiudiDlg();
+      case 'scontrino': return apriScontrino();
+      case 'svuota': S.carrello = []; chiudiDlg(); return render();
+      case 'confCarta': return registraVendita('carta');
+      case 'confContanti': return registraVendita('contanti');
+      case 'confAnn': return confermaAnnullo(d.id);
+      case 'chiudi': return chiudiCassa();
+      case 'pulisciErr': X.set('errori', []); X.aggiornaStato(); return render();
+      case 'addProd': $('#lstBody').insertAdjacentHTML('beforeend', rigaListino()); return;
+      case 'delProd': t.closest('tr').remove(); return;
+      case 'salvaListino': return salvaListino();
+      case 'confListino': return confermaListino();
+      case 'setK': return provaChiave();
+      case 'opOk': {
+        var sel = document.querySelector('[data-op].on'), nome = ($('#opNome').value || '').trim() || (sel ? sel.dataset.op : '');
+        if (!nome) return X.toast('Scegli o scrivi un nome.', 'err');
+        X.set('operatore', nome.slice(0, 60)); chiudiDlg(); render();
+        var poi = S.dopoOp; S.dopoOp = null; if (poi) poi();
+        return;
+      }
+    }
+  });
+  document.addEventListener('input', function (ev) {
+    if (ev.target.id === 'contati') {
+      var s = somme(aperte()), v = Number(ev.target.value.replace(',', '.')), el = $('#diff');
+      if (!ev.target.value || isNaN(v)) { el.textContent = ''; return; }
+      var df = Math.round((v - s.contanti) * 100) / 100;
+      el.textContent = df === 0 ? 'Il conto torna.' : (df > 0 ? 'Ci sono ' + X.euro(df) + ' in più.' : 'Mancano ' + X.euro(-df) + '.');
+      el.style.color = df === 0 ? 'var(--verde)' : 'var(--rosso)';
+    }
+  });
+  dlg.addEventListener('click', function (ev) { if (ev.target === dlg) chiudiDlg(); });
+  window.matchMedia('(max-width:820px)').addEventListener('change', render);
+
+  X.avvia('bar', {
+    onStato: suStato,
+    onChiave: function () { X.salvaChiave(''); setup(); },
+    onEsiti: function () { if (S.vista === 'oggi') render(); }
+  });
+  if (!X.chiave()) setup(); else render();
+})();
+</script>
+</body>
+</html>
