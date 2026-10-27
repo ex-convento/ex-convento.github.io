@@ -63,6 +63,25 @@
     dl.innerHTML = out.slice(0, 300).map(function (n) { return '<option value="' + X.esc(n) + '"></option>'; }).join('');
   };
 
+  /* ---------- menu delle app (solo sui dispositivi personali, non sui tablet-postazione) ---------- */
+  X.menuApp = function () {
+    var st = X.stato() || {}, top = document.querySelector('.top'), btn = document.getElementById('appBtn');
+    var mostra = top && st.postazione && !/^postazione/i.test(st.postazione);
+    if (!mostra) { if (btn) btn.remove(); return; }
+    if (btn) return;
+    btn = document.createElement('button'); btn.id = 'appBtn'; btn.className = 'appbtn'; btn.setAttribute('aria-label', 'Altre app');
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>';
+    var sync = document.getElementById('sync'); top.insertBefore(btn, sync ? sync.nextSibling : null);
+    btn.onclick = function () {
+      var d = document.getElementById('appDlg');
+      if (!d) { d = document.createElement('dialog'); d.id = 'appDlg'; document.body.appendChild(d); d.addEventListener('click', function (e) { if (e.target === d || e.target.closest('[data-chiudi]')) d.close(); }); }
+      var voci = [['../', 'Gestionale', 'Cassa, turni, forni, eventi, avvisi'], ['../bar/', 'Bar', 'Cassa del bar, chiusura serata'], ['../forni/', 'Forni', 'Carico, cottura, prenotazioni'], ['../pubblico/', 'Bacheca pubblica', 'Quello che vede chi visita la sede']];
+      d.innerHTML = '<div class="dlg-h"><h2>Le app dell\u2019Ex Convento</h2><button class="dlg-x" data-chiudi aria-label="Chiudi">×</button></div><div class="dlg-b"><div class="applinks">' +
+        voci.map(function (v) { return '<a class="applink" href="' + v[0] + '"><b>' + v[1] + '</b><span>' + v[2] + '</span></a>'; }).join('') + '</div></div>';
+      d.showModal();
+    };
+  };
+
   /* ---------- aiuto in pagina ---------- */
   X.aiuto = function (titolo, punti) {
     var top = document.querySelector('.top'), sync = document.getElementById('sync'); if (!top || document.getElementById('aiutoBtn')) return;
@@ -96,6 +115,7 @@
   X.call = function (a, extra) {
     var body = {a: a, k: X.chiave()};
     if (opts.extra) body.extra = opts.extra;
+    body.attesa = X.coda().length;
     Object.keys(extra || {}).forEach(function (n) { body[n] = extra[n]; });
     var ctl = window.AbortController ? new AbortController() : null;
     var to = setTimeout(function () { if (ctl) ctl.abort(); }, 30000);
@@ -149,7 +169,7 @@
         if (opts.onEsiti) opts.onEsiti(j.esiti);
         if (resto.length) setTimeout(X.sync, 200);
       }
-      applica(j); X.aggiornaNomi(); stato();
+      applica(j); X.aggiornaNomi(); X.menuApp(); stato();
     }, function (e) {
       busy = false;
       if (e.server && /CHIAVE_NON_VALIDA/.test(e.message)) {
@@ -193,7 +213,7 @@
     sveglia();
     stato();
     var s = X.stato(); if (s && opts.onStato) opts.onStato(s);
-    X.aggiornaNomi();
+    X.aggiornaNomi(); X.menuApp();
     if (timer) clearInterval(timer);
     timer = setInterval(function () { stato(); X.sync(); if (opts.onTick) opts.onTick(); }, 20000);
     if (X.chiave()) X.sync(true);

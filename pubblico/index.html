@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Josefin+Sans:wght@600;700&display=swap">
 <link rel="stylesheet" href="../comune.css">
 <style>
-  .wrap{padding:18px;max-width:1200px;margin:0 auto}
+  .wrap{padding:18px;max-width:1200px;margin:0 auto;font-size:17px}
   .saluto{font:700 30px/1.1 var(--display);margin:6px 0 2px}
   .data{color:var(--muted);margin-bottom:16px}
   .azioniHome{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-bottom:18px}
@@ -51,6 +51,14 @@
   .ev .q b{font:700 24px/1 var(--display)}
   .ev .d{flex:1}
   .ev .d small{display:block;color:var(--muted)}
+  #riposo{position:fixed;inset:0;z-index:200;background:#0d0b09;color:#f4efe4;display:grid;place-items:center;text-align:center;padding:24px;cursor:pointer}
+  #riposo .rp-in{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:640px}
+  #riposo .rp-ora{font:700 72px/1 var(--display);color:#FEA501;letter-spacing:.04em}
+  #riposo .rp-data{font-size:20px;color:#cfc6b6;text-transform:capitalize}
+  #riposo .rp-box{background:#1a1814;border-radius:18px;padding:16px 22px;width:100%;text-align:left;line-height:1.6;font-size:18px}
+  #riposo .rp-box b{display:block;color:#FEA501;font-family:var(--display);letter-spacing:.06em;text-transform:uppercase;font-size:15px;margin-bottom:4px}
+  #riposo .rp-tocca{margin-top:6px;color:#a69e8f;animation:respiro 2s ease-in-out infinite}
+  @keyframes respiro{50%{opacity:.4}}
 </style>
 </head>
 <body>
@@ -246,14 +254,34 @@
     }, function (e) { X.salvaChiave(''); X.toast(e.server ? 'Chiave non valida.' : 'Serve la rete per collegarsi.', 'err'); });
   }
 
+  /* ---------- salvaschermo dopo 3 minuti: eventi, desideri, orologio ---------- */
+  var riposo = null;
+  function mostraRiposo() {
+    if (riposo || !X.chiave()) return;
+    var p = P(), ev = (p.eventi || []).slice(0, 3), des = (p.desideri || []).slice(0, 4), d = new Date();
+    riposo = document.createElement('div'); riposo.id = 'riposo';
+    riposo.innerHTML = '<div class="rp-in"><img src="../logo.png" alt="" width="110"><div class="rp-ora">' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + '</div><div class="rp-data">' + dataLunga(X.oggi()) + '</div>' +
+      (ev.length ? '<div class="rp-box"><b>In programma</b>' + ev.map(function (e) { return '<div>' + X.esc(dataLunga(e.data)) + (e.ora ? ' · ' + X.esc(e.ora) : '') + ' — ' + X.esc(e.titolo) + '</div>'; }).join('') + '</div>' : '') +
+      (des.length ? '<div class="rp-box"><b>Cosa ci servirebbe</b>' + des.map(function (x) { return '<div>' + X.esc(x.cosa) + '</div>'; }).join('') + '</div>' : '') +
+      '<div class="rp-tocca">Tocca lo schermo per iniziare</div></div>';
+    riposo.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); togliRiposo(); });
+    document.body.appendChild(riposo);
+  }
+  function togliRiposo() { if (riposo) { riposo.remove(); riposo = null; } }
+
   /* ---------- torna all'inizio dopo 2 minuti senza tocchi ---------- */
   var ultimo = Date.now();
   ['pointerdown', 'keydown'].forEach(function (t) { document.addEventListener(t, function () { ultimo = Date.now(); }, true); });
+  var azzerato = false;
   setInterval(function () {
-    if (Date.now() - ultimo < 120000) return;
-    ultimo = Date.now(); S.bozza = null;
-    if (dlg.open) dlg.close();
-    if (S.vista !== 'home') { S.vista = 'home'; render(); window.scrollTo(0, 0); }
+    var fermo = Date.now() - ultimo;
+    if (fermo < 120000) { azzerato = false; return; }
+    if (!azzerato) {
+      azzerato = true; S.bozza = null;
+      if (dlg.open) dlg.close();
+      if (S.vista !== 'home') { S.vista = 'home'; render(); window.scrollTo(0, 0); }
+    }
+    if (fermo > 180000 && !dlg.open) mostraRiposo();
   }, 10000);
 
   document.addEventListener('click', function (ev) {

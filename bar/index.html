@@ -164,7 +164,7 @@
   }
   function scontrinoHtml() {
     var h = '<div class="sc-h"><h2 style="margin:0">Scontrino</h2>' + (S.carrello.length ? '<button class="btn lin" data-act="svuota" style="min-height:40px;padding:0 12px">Svuota</button>' : '') + '</div><div class="righe">';
-    if (!S.carrello.length) h += '<div class="vuota">Tocca i prodotti a sinistra per aggiungerli.</div>';
+    if (!S.carrello.length) { var ult = ultimaVendita(); h += '<div class="vuota">Tocca i prodotti a sinistra per aggiungerli.' + (ult ? '<br><button class="btn lin" data-act="ripeti" style="margin-top:14px;min-height:44px">Ripeti l\'ultimo: ' + X.esc(ult.righe.map(function (r) { return r.q + '× ' + r.nome; }).join(', ')) + '</button>' : '') + '</div>'; }
     h += S.carrello.map(function (r) {
       return '<div class="riga"><div class="nm">' + X.esc(r.nome) + '<small>' + X.euro(r.prezzo) + '</small></div>' +
         '<button class="qbtn" data-q="-1" data-id="' + X.esc(r.id) + '" aria-label="Togli">−</button><span class="qq">' + r.q + '</span>' +
@@ -177,6 +177,7 @@
     return h;
   }
 
+  function ultimaVendita() { var oggi = X.oggi(); var l = vendite().filter(function (v) { return v.data === oggi && v.totale >= 0 && !v.storno && !v.annullata && v.metodo !== 'omaggio'; }); return l.length ? l[l.length - 1] : null; }
   function aperte() { return vendite().filter(function (v) { return !v.chiusa; }); }
   function somme(lista) {
     var o = {n: 0, contanti: 0, carta: 0, tot: 0, omaggi: 0, omaggiVal: 0, prodotti: {}};
@@ -394,6 +395,7 @@
       case 'x': return chiudiDlg();
       case 'scontrino': return apriScontrino();
       case 'svuota': S.carrello = []; chiudiDlg(); return render();
+      case 'ripeti': { var u = ultimaVendita(); if (u) { S.carrello = u.righe.filter(function (r) { return r.q > 0; }).map(function (r) { return {id: r.id, nome: r.nome, prezzo: r.prezzo, cassa: r.cassa, q: r.q}; }); render(); } return; }
       case 'confCarta': return registraVendita('carta');
       case 'confContanti': return registraVendita('contanti');
       case 'confOmaggio': { var mb = document.querySelector('#omMot .on'); return registraVendita('omaggio', {motivo: mb ? mb.dataset.mot : 'Omaggio', perChi: X.ricordaNome(($('#omChi') || {}).value || '')}); }
