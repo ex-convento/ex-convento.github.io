@@ -92,6 +92,8 @@
   .legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);font-weight:700;margin:0 0 12px}
   .legenda i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:2px dashed #b9b2a4}
   .legenda i.p{background:#4f4a42;border:0}.legenda i.s{background:var(--ambra-soft);border:2px solid var(--ambra)}
+  .pers{margin:4px 0 14px;border:1px solid var(--linea);border-radius:var(--r-sm);padding:10px 14px}
+  .pers summary{font-weight:700;cursor:pointer;color:var(--muted)}
   .riep{display:flex;justify-content:space-between;align-items:baseline;background:var(--sup2);border-radius:var(--r-sm);padding:12px 14px;font-weight:700;margin-bottom:6px}
   .riep b{font:700 26px/1 var(--display)}
   @media (max-width:520px){.wrap{padding:12px}.timer{font-size:34px}.forno .fb{padding:14px}}
@@ -178,7 +180,7 @@
     coda.forEach(function (c) { if (c.tipo === 'mappaAnnulla') annullate[c.rif] = 1; });
     var ids = {}, out = [];
     srv.forEach(function (r) { ids[r.id] = 1; if (r.forno === t && r.data === data && r.stato === 'prenotato' && !annullate[r.id]) out.push(r); });
-    coda.forEach(function (c) { if (c.tipo === 'mappa' && !ids[c.id] && c.forno === t && c.data === data) out.push({id: c.id, forno: c.forno, data: c.data, posti: c.posti, nome: c.nome, temperatura: c.temperatura, note: c.note, prezzo: prezzo(t, c.posti, c.temperatura), attesa: true, quando: c.quando}); });
+    coda.forEach(function (c) { if (c.tipo === 'mappa' && !ids[c.id] && c.forno === t && c.data === data) out.push({id: c.id, forno: c.forno, data: c.data, posti: c.posti, nome: c.nome, temperatura: c.temperatura, note: c.note, prezzo: c.importo !== '' && c.importo != null ? Number(c.importo) : prezzo(t, c.posti, c.temperatura), listino: prezzo(t, c.posti, c.temperatura), motivo: c.motivo || '', attesa: true, quando: c.quando}); });
     return out.sort(function (a, b) { return String(a.quando).localeCompare(String(b.quando)); });
   }
   function occupati(lista) { var o = {}; lista.forEach(function (r) { (r.posti || []).forEach(function (x) { o[x] = r; }); }); return o; }
@@ -404,6 +406,7 @@
     var r = mappa(t, S.dataSel).filter(function (x) { return x.id === rid; })[0]; if (!r) return;
     apri(X.esc(r.nome), '<div class="riep"><span>' + X.esc(nomeForno(t)) + ' · ' + X.esc(etichetta(r.posti)) + '</span><b>' + (r.prezzo != null ? X.euro(r.prezzo) : '') + '</b></div>' +
       '<p class="muted" style="margin:6px 0 14px">' + X.esc([S.dataSel.slice(8) + '/' + S.dataSel.slice(5, 7), r.temperatura, r.note].filter(String).join(' · ')) + (r.attesa ? ' · <span class="badge ara">da inviare</span>' : '') + '</p>' +
+      (r.motivo ? '<p class="muted" style="margin:-6px 0 14px">Importo personalizzato (listino ' + X.esc(X.euro(r.listino)) + '): ' + X.esc(r.motivo) + '</p>' : '') +
       '<div class="azioni"><button class="btn lin" data-act="mAnn" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">Annulla prenotazione</button><button class="btn ver" data-act="mPaga" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">Incassa' + (r.prezzo != null ? ' ' + X.euro(r.prezzo) : '') + '</button></div>');
   }
   function formMappa(t) {
@@ -417,6 +420,7 @@
       (tf ? '<div class="campo"><span>Temperatura</span><div class="tfix on" style="--fc:' + colForno(t) + '">' + X.esc(tf.t) + ' · decisa da ' + X.esc(tf.chi) + '</div></div>'
           : '<div class="campo"><span>Temperatura della cottura</span><div class="scelte" data-gruppo="mtemp">' + temps.map(function (x) { return '<button type="button" class="scelta" data-sc="' + X.esc(x) + '">' + X.esc(x) + '</button>'; }).join('') + '</div></div>') +
       '<label class="campo"><span>Note</span><input id="mNote" placeholder="facoltative, es. 6 tazze smaltate"></label>' +
+      '<details class="pers"><summary>Importo diverso dal listino</summary><label class="campo"><span>Importo da pagare (€)</span><input id="mImp" inputmode="decimal" placeholder="es. 15"></label><label class="campo"><span>Motivo (obbligatorio)</span><input id="mMot" placeholder="es. cottura di prova, accordo con il direttivo"></label></details>' +
       '<button class="btn prim big full" data-act="mConf" data-f="' + X.esc(t) + '">Prenota</button><p class="muted" style="font-size:14px">Senza rete la prenotazione parte appena torna la connessione. Se nel frattempo il posto viene preso, la trovi in Storico come "da controllare".</p>');
   }
   function confMappa(t) {
@@ -425,8 +429,10 @@
     var lista = mappa(t, S.dataSel), tf = tempFissa(lista), temp = tf ? tf.t : valScelta('mtemp');
     if (!temp) return X.toast('Scegli la temperatura della cottura.', 'err');
     var ps = normPosti(S.sel.posti.slice()), occ = occupati(lista);
+    var impS = (($('#mImp') || {}).value || '').trim(), imp = null, mot = (($('#mMot') || {}).value || '').trim();
+    if (impS) { imp = Number(impS.replace(',', '.')); if (!(imp >= 0) || imp > 1000) return X.toast('Importo non valido.', 'err'); if (mot.length < 3) return X.toast('Scrivi il motivo dell\'importo diverso.', 'err'); imp = Math.round(imp * 100) / 100; }
     if ((ps[0] === 'intero' && lista.length) || occ.intero || ps.some(function (x) { return occ[x]; })) { S.sel = null; chiudiDlg(); render(); return X.toast('Nel frattempo qualcuno ha preso quel posto: riprova.', 'err'); }
-    var e = X.accoda({tipo: 'mappa', forno: t, data: S.dataSel, posti: ps, nome: nome.slice(0, 120), temperatura: temp, note: ($('#mNote').value || '').trim().slice(0, 300), quando: X.adesso(), operatore: operatore() || nome});
+    var e = X.accoda({tipo: 'mappa', forno: t, data: S.dataSel, posti: ps, nome: nome.slice(0, 120), temperatura: temp, note: ($('#mNote').value || '').trim().slice(0, 300), quando: X.adesso(), operatore: operatore() || nome, importo: imp == null ? '' : imp, motivo: imp == null ? '' : mot.slice(0, 200)});
     S.sel = null; chiudiDlg(); render(); dimentica();
     X.toast('Prenotato: ' + etichetta(ps) + ' · ' + nomeForno(t), 'ok', {label: 'Annulla', fn: function () { annullaInCoda(e.id, 'Prenotazione'); }});
   }
