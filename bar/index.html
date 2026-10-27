@@ -152,6 +152,7 @@
       S.noteCasse = nota; X.set('casseNote', nota);
     }
     if (s.eventiVicini && s.eventiVicini.ok) S.eventiVicini = s.eventiVicini.values || [];
+    if (s.scorteBasse && s.scorteBasse.ok) S.scorteBasse = s.scorteBasse.values || [];
     applicaCassa();
     S.operatori = s.operatori || [];
     S.postazione = s.postazione || '';
@@ -195,6 +196,7 @@
   function vCassa() {
     var gs = gruppi(), h = '<section class="prod">', ce = cassaEv();
     if (ce) h += '<div class="evbanner"><b>' + X.esc(ce.nome) + '</b><span>Cassa evento' + (ce.data ? ' del ' + ce.data.slice(8) + '/' + ce.data.slice(5, 7) : '') + ': prezzi dell\'evento, incassi in EVENTI.</span><button class="btn lin" data-act="casse" style="min-height:40px;color:#fff;border-color:#3a362f">Cambia cassa</button></div>';
+    if ((S.scorteBasse || []).length) h += '<div class="avviso"><span>Sta finendo: ' + S.scorteBasse.map(function (x) { return X.esc(x.nome) + ' (' + String(x.quantita).replace('.', ',') + ' ' + X.esc(x.unita) + ')'; }).join(', ') + '</span></div>';
     if (S.esempio && !ce) h += '<div class="avviso">Prodotti e prezzi di esempio: aggiorna il listino prima di usare la cassa. <button class="btn amb" data-v-go="listino" style="min-height:42px">Apri listino</button></div>';
     if (!S.listino.length) h += '<div class="card vuota">' + (ce ? 'Il listino di questo evento è vuoto. <button class="btn amb" data-v-go="listino" style="min-height:42px;margin-left:8px">Prepara il listino</button>' : 'Il listino non è ancora arrivato. Serve un attimo di rete la prima volta.') + '</div>';
     if (gs.length > 1) h += '<div class="scelte" style="margin-bottom:12px">' + ['Tutti'].concat(gs).map(function (g) { return '<button class="scelta' + (S.gruppo === g ? ' on' : '') + '" data-g="' + X.esc(g) + '">' + X.esc(g) + '</button>'; }).join('') + '</div>';
