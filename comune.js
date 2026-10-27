@@ -206,7 +206,14 @@
   X.avvia = function (nome, o) {
     app = nome; opts = o || {};
     if (chiaveUrl) { X.salvaChiave(chiaveUrl); chiaveUrl = ''; }
-    if (navigator.serviceWorker && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(function () {});
+    if (navigator.serviceWorker && location.protocol === 'https:') {
+      var giaControllata = !!navigator.serviceWorker.controller, ricaricata = false;
+      navigator.serviceWorker.register('../sw.js', {updateViaCache: 'none'}).then(function (reg) {
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') reg.update().catch(function () {}); });
+      }).catch(function () {});
+      /* quando arriva una versione nuova dell'app, la pagina si ricarica da sola (una volta) */
+      navigator.serviceWorker.addEventListener('controllerchange', function () { if (giaControllata && !ricaricata && !document.querySelector('dialog[open]')) { ricaricata = true; location.reload(); } });
+    }
     window.addEventListener('online', function () { nextAt = 0; stato(); X.sync(true); });
     window.addEventListener('offline', stato);
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { sveglia(); X.sync(); } });
