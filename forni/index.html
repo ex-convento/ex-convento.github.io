@@ -240,26 +240,40 @@
     var ops = PUB ? [] : ((S.srv && S.srv.operatori) || []), op = operatore();
     S.dopoOp = poi || null;
     apri(PUB ? 'Come ti chiami?' : 'Chi sei?', '<p class="muted" style="margin-top:0">Ogni movimento dei forni viene registrato con questo nome' + (PUB ? ' (computer pubblico: lo chiediamo a ogni operazione).' : '.') + '</p><div class="scelte">' + ops.map(function (n) { return '<button class="scelta' + (n === op ? ' on' : '') + '" data-op="' + X.esc(n) + '">' + X.esc(n) + '</button>'; }).join('') + '</div>' +
-      '<label class="campo"><span>' + (ops.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" autocomplete="off" placeholder="Nome e cognome"></label><button class="btn prim full" data-act="opOk">Conferma</button>');
+      '<label class="campo"><span>' + (ops.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" list="excvNomi" autocomplete="off" placeholder="Nome e cognome"></label><button class="btn prim full" data-act="opOk">Conferma</button>');
   }
   function evento(t, stato, extra) {
+    var prima = statoDi(t);
     var e = {tipo: 'forno', forno: t, stato: stato, quando: X.adesso(), operatore: operatore()};
     Object.keys(extra || {}).forEach(function (k) { e[k] = extra[k]; });
     e = X.accoda(e);
     var l = locali(); l.push(e); X.set('eventi', l.slice(-80));
     chiudiDlg(); render(); dimentica();
-    X.toast(nomeForno(t) + ': ' + (STATI[stato] || {}).nome.toLowerCase(), 'ok');
+    var chiE = e.operatore;
+    X.toast(nomeForno(t) + ': ' + (STATI[stato] || {}).nome.toLowerCase(), 'ok', {label: 'Annulla', fn: function () { annullaUltimo(t, e, prima, chiE); }});
+  }
+  function annullaUltimo(t, e, prima, chi) {
+    var c = X.coda(), inCoda = !X.inInvio() && c.some(function (x) { return x.id === e.id; });
+    if (inCoda) { X.set('coda', c.filter(function (x) { return x.id !== e.id; })); X.set('eventi', locali().filter(function (x) { return x.id !== e.id; })); X.aggiornaStato(); render(); return X.toast('Annullato', 'ok'); }
+    var q = X.adesso(); if (q <= e.quando) q = X.adesso(new Date(Date.parse(e.quando) + 1000));
+    var r = X.accoda({tipo: 'forno', forno: t, stato: prima.stato || 'libero', quando: q, operatore: chi, temperatura: prima.temperatura || '', pezzi: prima.pezzi || '', note: 'annullato: ' + (STATI[e.stato] || {}).nome});
+    var l = locali(); l.push(r); X.set('eventi', l.slice(-80)); render(); X.toast('Annullato: torna ' + (STATI[prima.stato || 'libero'] || {}).nome.toLowerCase(), 'ok');
+  }
+  function annullaInCoda(id, cosa) {
+    var c = X.coda();
+    if (X.inInvio() || !c.some(function (x) { return x.id === id; })) return X.toast(cosa + ' già inviato al gestionale: correggilo da lì.', 'err');
+    X.set('coda', c.filter(function (x) { return x.id !== id; })); X.set('eventi', locali().filter(function (x) { return x.id !== id; })); X.aggiornaStato(); render(); X.toast(cosa + ' annullato', 'ok');
   }
   function formCarica(t) {
     var s = statoDi(t);
-    apri('Carica ' + X.esc(nomeForno(t)), '<label class="campo"><span>Di chi sono i pezzi?</span><input id="fChi" value="' + X.esc(operatore()) + '"></label>' +
+    apri('Carica ' + X.esc(nomeForno(t)), '<label class="campo"><span>Di chi sono i pezzi?</span><input id="fChi" list="excvNomi" autocomplete="off" value="' + X.esc(operatore()) + '"></label>' +
       '<label class="campo"><span>Cosa c\'è dentro</span><input id="fPezzi" placeholder="es. 12 tazze biscotto, 2 piatti smaltati"></label>' +
       '<div class="campo"><span>Temperatura prevista</span>' + scelteTemp(s.temperatura || '', 'temp') + '</div>' +
       '<label class="campo"><span>Note</span><input id="fNote" placeholder="facoltative"></label>' +
       '<div class="azioni"><button class="btn lin" data-act="confCarica" data-f="' + X.esc(t) + '" data-dopo="no">Solo caricato</button><button class="btn ros" data-act="confCarica" data-f="' + X.esc(t) + '" data-dopo="cottura">Carica e avvia</button></div>');
   }
   function confCarica(t, dopo) {
-    var chi = $('#fChi').value.trim(), pezzi = $('#fPezzi').value.trim(), temp = valScelta('temp'), note = $('#fNote').value.trim();
+    var chi = X.nomePulito($('#fChi').value), pezzi = $('#fPezzi').value.trim(), temp = valScelta('temp'), note = $('#fNote').value.trim();
     var det = {pezzi: pezzi.slice(0, 40), temperatura: temp, note: [chi && chi !== operatore() ? 'pezzi di ' + chi : '', note].filter(String).join(' · ').slice(0, 300)};
     if (pezzi.length > 40) det.note = (pezzi + (det.note ? ' · ' + det.note : '')).slice(0, 300);
     if (dopo === 'cottura') {
@@ -276,14 +290,14 @@
   function formPren(t) {
     var gs = giorniMese(); if (gs.indexOf(S.giorno) < 0) S.giorno = gs[0];
     apri('Prenota ' + X.esc(nomeForno(t)), '<label class="campo"><span>Giorno</span><select id="pG">' + gs.map(function (g) { return '<option value="' + g + '"' + (g === S.giorno ? ' selected' : '') + '>' + g + (g === new Date().getDate() ? ' (oggi)' : '') + '</option>'; }).join('') + '</select></label>' +
-      '<label class="campo"><span>Artista / socio</span><input id="pA" value="' + X.esc(operatore()) + '"></label>' +
+      '<label class="campo"><span>Artista / socio</span><input id="pA" list="excvNomi" autocomplete="off" value="' + X.esc(operatore()) + '"></label>' +
       '<label class="campo"><span>Quantità</span><input id="pQ" placeholder="es. mezzo forno, 10 pezzi"></label>' +
       '<div class="campo"><span>Temperatura</span>' + scelteTemp('', 'ptemp') + '</div>' +
       '<label class="campo"><span>Note</span><input id="pN" placeholder="facoltative"></label>' +
       '<button class="btn prim big full" data-act="confPren" data-f="' + X.esc(t) + '">Prenota</button><p class="muted" style="font-size:14px">Senza rete la prenotazione parte appena torna la connessione. Se nel frattempo il giorno si riempie, la trovi in Storico come "da controllare".</p>');
   }
   function formPaga(t) {
-    apri('Incassa infornata', '<label class="campo"><span>Chi paga</span><input id="iChi" placeholder="Nome"></label>' +
+    apri('Incassa infornata', '<label class="campo"><span>Chi paga</span><input id="iChi" list="excvNomi" autocomplete="off" placeholder="Nome"></label>' +
       '<label class="campo"><span>Importo</span><input id="iImp" inputmode="decimal" placeholder="es. 15"></label>' +
       '<div class="campo"><span>Metodo</span><div class="scelte" data-gruppo="met"><button class="scelta on" data-sc="contanti">Contanti</button><button class="scelta" data-sc="carta">Carta</button></div></div>' +
       '<button class="btn ver big full" data-act="confPaga" data-f="' + X.esc(t) + '">Registra incasso</button><p class="muted" style="font-size:14px">Finisce nel Flusso di Cassa come LAB INFORNATE, con il tuo nome.</p>');
@@ -329,16 +343,16 @@
       case 'confCottura': return evento(f, 'cottura', {temperatura: valScelta('temp'), note: $('#fNote').value.trim().slice(0, 300), pezzi: statoDi(f).pezzi || ''});
       case 'confNota': { var n = $('#nT').value.trim(); if (!n) return X.toast('Scrivi due parole su cosa succede.', 'err'); return evento(f, d.st, {note: n.slice(0, 300)}); }
       case 'confPren': {
-        var a = $('#pA').value.trim(); if (!a) return X.toast('Scrivi il nome di chi prenota.', 'err');
+        var a = PUB ? X.nomePulito($('#pA').value) : X.ricordaNome($('#pA').value); if (!a) return X.toast('Scrivi il nome di chi prenota.', 'err');
         var g = Number($('#pG').value);
         var e = X.accoda({tipo: 'prenotazione', forno: f, giorno: g, artista: a.slice(0, 120), quantita: $('#pQ').value.trim().slice(0, 120), temperatura: valScelta('ptemp'), note: $('#pN').value.trim().slice(0, 300), quando: X.adesso(), operatore: operatore()});
-        var l = locali(); l.push(e); X.set('eventi', l.slice(-80)); S.giorno = g; chiudiDlg(); render(); dimentica(); X.toast('Prenotato ' + nomeForno(f) + ' il ' + g, 'ok'); return;
+        var l = locali(); l.push(e); X.set('eventi', l.slice(-80)); S.giorno = g; chiudiDlg(); render(); dimentica(); X.toast('Prenotato ' + nomeForno(f) + ' il ' + g, 'ok', {label: 'Annulla', fn: function () { annullaInCoda(e.id, 'Prenotazione'); }}); return;
       }
       case 'confPaga': {
         var imp = Number(($('#iImp').value || '').replace(',', '.')); if (!(imp > 0)) return X.toast('Importo non valido.', 'err');
-        var chi = $('#iChi').value.trim(); if (!chi) return X.toast('Scrivi chi paga.', 'err');
+        var chi = X.nomePulito($('#iChi').value); if (!chi) return X.toast('Scrivi chi paga.', 'err');
         var p = X.accoda({tipo: 'incasso', forno: f, importo: Math.round(imp * 100) / 100, metodo: valScelta('met') || 'contanti', data: X.oggi(), causale: 'Infornata ' + chi + ' · ' + nomeForno(f), cassa: 'LAB INFORNATE', quando: X.adesso(), operatore: operatore()});
-        var l2 = locali(); l2.push(p); X.set('eventi', l2.slice(-80)); chiudiDlg(); render(); dimentica(); X.toast('Incasso registrato · ' + X.euro(p.importo), 'ok'); return;
+        var l2 = locali(); l2.push(p); X.set('eventi', l2.slice(-80)); chiudiDlg(); render(); dimentica(); X.toast('Incasso registrato · ' + X.euro(p.importo), 'ok', {label: 'Annulla', fn: function () { annullaInCoda(p.id, 'Incasso'); }}); return;
       }
       case 'pulisciErr': X.set('errori', []); X.aggiornaStato(); return render();
       case 'setK': return provaChiave();
@@ -346,12 +360,13 @@
         var sel = document.querySelector('[data-op].on'), nome = ($('#opNome').value || '').trim() || (sel ? sel.dataset.op : '');
         if (!nome) return X.toast('Scegli o scrivi un nome.', 'err');
         if (nome.length < 2) return X.toast('Scrivi nome e cognome.', 'err');
-        if (PUB) S.opTemp = nome.slice(0, 60); else X.set('operatore', nome.slice(0, 60)); chiudiDlg(); render(); var poi = S.dopoOp; S.dopoOp = null; if (poi) poi(); return;
+        if (PUB) S.opTemp = X.nomePulito(nome); else X.set('operatore', X.ricordaNome(nome)); chiudiDlg(); render(); var poi = S.dopoOp; S.dopoOp = null; if (poi) poi(); return;
       }
     }
   });
   dlg.addEventListener('click', function (ev) { if (ev.target === dlg) chiudiDlg(); });
 
+  X.aiuto('Come si usano i forni', ['Ogni scheda è un forno: vedi se è libero, caricato, in cottura o in raffreddamento, da quanto e chi l’ha usato.', 'Carica il forno → Avvia cottura → Fine cottura → Scaricato: ogni passaggio resta registrato con il tuo nome.', 'Hai toccato il pulsante sbagliato? Tocca Annulla nel messaggio verde.', 'Prenotazioni: scegli il giorno; finiscono nello stesso foglio usato dal gestionale.', 'Incassa infornata registra il pagamento nella cassa dell’associazione.', 'Senza rete funziona lo stesso: le operazioni partono quando torna la connessione.']);
   X.avvia('forni', {
     onStato: function (s) {
       S.srv = s;

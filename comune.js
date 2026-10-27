@@ -30,12 +30,51 @@
   };
 
   /* ---------- avvisi ---------- */
-  X.toast = function (msg, tipo) {
+  X.toast = function (msg, tipo, azione) {
     var box = document.getElementById('toasts');
     if (!box) { box = document.createElement('div'); box.id = 'toasts'; document.body.appendChild(box); }
     var t = document.createElement('div'); t.className = 'toast ' + (tipo || ''); t.textContent = msg; box.appendChild(t);
-    setTimeout(function () { t.classList.add('via'); }, tipo === 'err' ? 5000 : 2600);
-    setTimeout(function () { t.remove(); }, tipo === 'err' ? 5600 : 3200);
+    var dura = azione ? 9000 : (tipo === 'err' ? 5000 : 2600);
+    if (azione) {
+      var b = document.createElement('button'); b.className = 'tbtn'; b.textContent = azione.label || 'Annulla';
+      b.onclick = function () { t.remove(); azione.fn(); };
+      t.appendChild(b); t.classList.add('conazione');
+    }
+    setTimeout(function () { t.classList.add('via'); }, dura);
+    setTimeout(function () { t.remove(); }, dura + 600);
+  };
+
+  /* ---------- nomi: suggeriti e scritti sempre allo stesso modo ---------- */
+  X.nomePulito = function (n) {
+    n = String(n || '').replace(/\s+/g, ' ').trim();
+    if (n === n.toLowerCase() || n === n.toUpperCase()) n = n.toLowerCase().replace(/(^|[\s'’-])(\S)/g, function (m, a, c) { return a + c.toUpperCase(); });
+    return n.slice(0, 60);
+  };
+  X.ricordaNome = function (n) {
+    n = X.nomePulito(n); if (n.length < 2) return n;
+    var l = X.get('nomi', []).filter(function (x) { return x.toLowerCase() !== n.toLowerCase(); }); l.unshift(n); X.set('nomi', l.slice(0, 60));
+    X.aggiornaNomi(); return n;
+  };
+  X.aggiornaNomi = function () {
+    var st = X.stato() || {}, set = {}, out = [];
+    X.get('nomi', []).concat(st.operatori || [], st.nomi || []).forEach(function (n) { var k = String(n).toLowerCase(); if (n && !set[k]) { set[k] = 1; out.push(n); } });
+    var dl = document.getElementById('excvNomi');
+    if (!dl) { dl = document.createElement('datalist'); dl.id = 'excvNomi'; document.body.appendChild(dl); }
+    dl.innerHTML = out.slice(0, 300).map(function (n) { return '<option value="' + X.esc(n) + '"></option>'; }).join('');
+  };
+
+  /* ---------- aiuto in pagina ---------- */
+  X.aiuto = function (titolo, punti) {
+    var top = document.querySelector('.top'), sync = document.getElementById('sync'); if (!top || document.getElementById('aiutoBtn')) return;
+    var b = document.createElement('button'); b.id = 'aiutoBtn'; b.className = 'aiutobtn'; b.setAttribute('aria-label', 'Aiuto'); b.textContent = '?';
+    top.insertBefore(b, sync ? sync.nextSibling : null);
+    b.onclick = function () {
+      var d = document.getElementById('aiutoDlg');
+      if (!d) { d = document.createElement('dialog'); d.id = 'aiutoDlg'; document.body.appendChild(d); d.addEventListener('click', function (e) { if (e.target === d || e.target.closest('[data-chiudi]')) d.close(); }); }
+      d.innerHTML = '<div class="dlg-h"><h2>' + X.esc(titolo) + '</h2><button class="dlg-x" data-chiudi aria-label="Chiudi">×</button></div><div class="dlg-b"><ol class="aiutolist">' +
+        punti.map(function (p) { return '<li>' + X.esc(p) + '</li>'; }).join('') + '</ol><button class="btn prim full" data-chiudi>Ho capito</button></div>';
+      d.showModal();
+    };
   };
 
   /* ---------- chiave della postazione ---------- */
@@ -79,6 +118,7 @@
     return item;
   };
   X.stato = function () { return X.get('stato', null); };
+  X.inInvio = function () { return busy; };
 
   function applica(j) {
     var s = {}; Object.keys(j).forEach(function (n) { if (n !== 'esiti' && n !== 'ok') s[n] = j[n]; });
@@ -109,7 +149,7 @@
         if (opts.onEsiti) opts.onEsiti(j.esiti);
         if (resto.length) setTimeout(X.sync, 200);
       }
-      applica(j); stato();
+      applica(j); X.aggiornaNomi(); stato();
     }, function (e) {
       busy = false;
       if (e.server && /CHIAVE_NON_VALIDA/.test(e.message)) {
@@ -153,6 +193,7 @@
     sveglia();
     stato();
     var s = X.stato(); if (s && opts.onStato) opts.onStato(s);
+    X.aggiornaNomi();
     if (timer) clearInterval(timer);
     timer = setInterval(function () { stato(); X.sync(); if (opts.onTick) opts.onTick(); }, 20000);
     if (X.chiave()) X.sync(true);

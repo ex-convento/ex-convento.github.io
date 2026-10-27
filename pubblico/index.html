@@ -185,8 +185,8 @@
       '<label class="campo"><span>Cosa viene donato</span><input id="dCosa" autocomplete="off" value="' + X.esc(x ? x.cosa : '') + '" placeholder="es. 10 kg di argilla, un trapano"></label>' +
       '<label class="campo"><span>Quantità (facoltativo)</span><input id="dQ" autocomplete="off" placeholder="es. 2 sacchi"></label>' +
       '<label class="campo"><span>Valore stimato in € (facoltativo)</span><input id="dVal" inputmode="decimal" placeholder="es. 30"></label>' +
-      '<label class="campo"><span>Chi lo dona (facoltativo)</span><input id="dDon" autocomplete="off" placeholder="Nome, o lascia vuoto se anonimo"></label>' +
-      '<label class="campo"><span>Il tuo nome e cognome (chi registra)</span><input id="dChi" autocomplete="off" placeholder="Obbligatorio"></label>' +
+      '<label class="campo"><span>Chi lo dona (facoltativo)</span><input id="dDon" list="excvNomi" autocomplete="off" placeholder="Nome, o lascia vuoto se anonimo"></label>' +
+      '<label class="campo"><span>Il tuo nome e cognome (chi registra)</span><input id="dChi" list="excvNomi" autocomplete="off" placeholder="Obbligatorio"></label>' +
       '<button class="btn amb big full" data-act="salvaDono">Registra il dono</button></div>';
     dlg.showModal();
   }
@@ -195,7 +195,7 @@
     if (cosa.length < 2) return X.toast('Scrivi cosa viene donato.', 'err');
     if (val && !(Number(val) >= 0)) return X.toast('Il valore stimato non è un numero.', 'err');
     if (chi.length < 3 || chi.indexOf(' ') < 0) return X.toast('Scrivi il tuo nome e cognome.', 'err');
-    X.accoda({tipo: 'donazione', cosa: cosa.slice(0, 200), quantita: $('#dQ').value.trim().slice(0, 60), valore: val, donatore: $('#dDon').value.trim().slice(0, 120), nome: chi.slice(0, 80), desiderio: S.desiderio || '', data: X.oggi()});
+    X.accoda({tipo: 'donazione', cosa: cosa.slice(0, 200), quantita: $('#dQ').value.trim().slice(0, 60), valore: val, donatore: X.nomePulito($('#dDon').value), nome: X.nomePulito(chi), desiderio: S.desiderio || '', data: X.oggi()});
     if (S.desiderio && S.srv && S.srv.pubblico) S.srv.pubblico.desideri = (S.srv.pubblico.desideri || []).filter(function (d) { return d.id !== S.desiderio; });
     dlg.close(); render(); X.toast('Grazie! Dono registrato.', 'ok');
   }
@@ -206,9 +206,9 @@
     S.voce = v;
     dlg.innerHTML = '<div class="dlg-h"><h2>' + v.e + ' ' + X.esc(v.label) + '</h2><button class="dlg-x" data-act="x" aria-label="Chiudi">×</button></div><div class="dlg-b">' +
       '<label class="campo"><span>Importo (€)</span><input id="cImp" inputmode="decimal" value="' + (v.imp ? String(v.imp) : '') + '" placeholder="es. 15"></label>' +
-      '<label class="campo"><span>' + X.esc(v.per) + '</span><input id="cPer" autocomplete="off"></label>' +
+      '<label class="campo"><span>' + X.esc(v.per) + '</span><input id="cPer" list="excvNomi" autocomplete="off"></label>' +
       '<div class="campo"><span>Come ha pagato?</span><div class="scelte" id="cMet"><button class="scelta on" data-met="contanti">Contanti</button><button class="scelta" data-met="carta">Carta / POS</button></div></div>' +
-      '<label class="campo"><span>Il tuo nome e cognome (chi registra)</span><input id="cChi" autocomplete="off" placeholder="Obbligatorio"></label>' +
+      '<label class="campo"><span>Il tuo nome e cognome (chi registra)</span><input id="cChi" list="excvNomi" autocomplete="off" placeholder="Obbligatorio"></label>' +
       '<button class="btn ver big full" data-act="conferma">Continua</button></div>';
     dlg.showModal();
     setTimeout(function () { var i = v.imp ? $('#cPer') : $('#cImp'); if (i) i.focus(); }, 60);
@@ -220,7 +220,7 @@
     if (imp > 500) return X.toast('Per importi sopra i 500 € chiedi al direttivo.', 'err');
     if (v.id !== 'donazione' && v.id !== 'bar' && !per) return X.toast('Compila: ' + v.per.toLowerCase() + '.', 'err');
     if (chi.length < 3 || chi.indexOf(' ') < 0) return X.toast('Scrivi il tuo nome e cognome.', 'err');
-    S.bozza = {tipo: 'entrata', importo: Math.round(imp * 100) / 100, cat: v.cat, metodo: met, data: X.oggi(), quando: X.adesso(), nome: chi.slice(0, 80), causale: (v.pre + (per ? ' ' + per : '')).slice(0, 160)};
+    S.bozza = {tipo: 'entrata', importo: Math.round(imp * 100) / 100, cat: v.cat, metodo: met, data: X.oggi(), quando: X.adesso(), nome: X.nomePulito(chi), causale: (v.pre + (per ? ' ' + X.nomePulito(per) : '')).slice(0, 160)};
     $('.dlg-b', dlg).innerHTML = '<div class="riepilogo">' + X.esc(S.bozza.causale) + '<br>' + X.euro(S.bozza.importo) + ' · ' + (met === 'carta' ? 'carta / POS' : 'contanti') + '<br>Registrato da ' + X.esc(S.bozza.nome) + '</div>' +
       '<p class="muted">' + (met === 'contanti' ? 'Ricordati di mettere i contanti nella cassa.' : 'Conferma solo se il pagamento col POS è andato a buon fine.') + '</p>' +
       '<div class="azioni"><button class="btn lin" data-voce="' + v.id + '">Modifica</button><button class="btn ver big" data-act="salva">Conferma</button></div>';
@@ -271,6 +271,7 @@
   });
   dlg.addEventListener('click', function (ev) { if (ev.target === dlg) dlg.close(); });
 
+  X.aiuto('Come si usa', ['Oggi: chi è in sede, lo stato dei forni, gli eventi e gli avvisi.', 'Registra un pagamento: tessere, infornate, ticket, bar, donazioni. Scrivi sempre il tuo nome e cognome.', 'Prima di salvare compare un riepilogo: controllalo e tocca Conferma.', 'Dono di materiale: per oggetti e materiali regalati all’associazione, non è un pagamento.', 'Forni e prenotazioni: per caricare un forno o prenotare una cottura.', 'Dopo due minuti senza tocchi la pagina torna all’inizio.']);
   X.avvia('pubblico', {
     extra: 'pubblico',
     onStato: function (s) {

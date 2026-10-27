@@ -259,7 +259,7 @@
     var op = operatore();
     var h = '<p class="muted" style="margin-top:0">Ogni vendita viene registrata con questo nome.</p><div class="scelte">' +
       S.operatori.map(function (n) { return '<button class="scelta' + (n === op ? ' on' : '') + '" data-op="' + X.esc(n) + '">' + X.esc(n) + '</button>'; }).join('') + '</div>' +
-      '<label class="campo"><span>' + (S.operatori.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" placeholder="Nome e cognome" autocomplete="off"></label>' +
+      '<label class="campo"><span>' + (S.operatori.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" list="excvNomi" placeholder="Nome e cognome" autocomplete="off"></label>' +
       '<button class="btn prim full" data-act="opOk">Conferma</button>';
     S.dopoOp = poi || null;
     apri('operatore', 'Chi è al banco?', h);
@@ -270,7 +270,7 @@
     if (metodo === 'omaggio') {
       apri('omaggio', 'Omaggio o consumo staff', '<div class="resto" style="background:var(--ocra-soft);color:var(--ocra)"><span>' + pezzi() + (pezzi() === 1 ? ' articolo' : ' articoli') + ' · non si incassa</span><span>0,00 €</span></div>' +
         '<p class="muted" style="margin:12px 0 6px">Perché non si paga?</p><div class="scelte" id="omMot">' + ['Consumo staff', 'Omaggio', 'Altro'].map(function (m, i) { return '<button class="scelta' + (i ? '' : ' on') + '" data-mot="' + m + '">' + m + '</button>'; }).join('') + '</div>' +
-        '<label class="campo"><span>Per chi</span><input id="omChi" value="' + X.esc(operatore()) + '" placeholder="Nome" autocomplete="off"></label>' +
+        '<label class="campo"><span>Per chi</span><input id="omChi" list="excvNomi" value="' + X.esc(operatore()) + '" placeholder="Nome" autocomplete="off"></label>' +
         '<p class="muted" style="font-size:14px">Viene contato nei consumi (così le scorte tornano), ma non entra nel Flusso di Cassa.</p>' +
         '<div class="azioni"><button class="btn lin" data-act="x">Indietro</button><button class="btn amb big" data-act="confOmaggio">Registra</button></div>');
       return;
@@ -302,7 +302,7 @@
     var lista = vendite(); lista.push(v); salvaVendite(lista);
     X.accoda(v);
     S.carrello = []; chiudiDlg(); render();
-    X.toast(metodo === 'omaggio' ? 'Registrato come ' + (v.motivo || 'omaggio').toLowerCase() + ' · ' + v.righe.reduce(function (a, r) { return a + r.q; }, 0) + ' pz' : 'Venduto · ' + X.euro(v.totale) + (metodo === 'carta' ? ' con carta' : ' in contanti'), 'ok');
+    X.toast(metodo === 'omaggio' ? 'Registrato come ' + (v.motivo || 'omaggio').toLowerCase() + ' · ' + v.righe.reduce(function (a, r) { return a + r.q; }, 0) + ' pz' : 'Venduto · ' + X.euro(v.totale) + (metodo === 'carta' ? ' con carta' : ' in contanti'), 'ok', {label: 'Annulla', fn: function () { confermaAnnullo(v.id); }});
   }
   function annulla(id) {
     var lista = vendite(), v = lista.filter(function (x) { return x.id === id; })[0];
@@ -396,7 +396,7 @@
       case 'svuota': S.carrello = []; chiudiDlg(); return render();
       case 'confCarta': return registraVendita('carta');
       case 'confContanti': return registraVendita('contanti');
-      case 'confOmaggio': { var mb = document.querySelector('#omMot .on'); return registraVendita('omaggio', {motivo: mb ? mb.dataset.mot : 'Omaggio', perChi: (($('#omChi') || {}).value || '').trim().slice(0, 60)}); }
+      case 'confOmaggio': { var mb = document.querySelector('#omMot .on'); return registraVendita('omaggio', {motivo: mb ? mb.dataset.mot : 'Omaggio', perChi: X.ricordaNome(($('#omChi') || {}).value || '')}); }
       case 'confAnn': return confermaAnnullo(d.id);
       case 'chiudi': return chiudiCassa();
       case 'pulisciErr': X.set('errori', []); X.aggiornaStato(); return render();
@@ -408,7 +408,7 @@
       case 'opOk': {
         var sel = document.querySelector('[data-op].on'), nome = ($('#opNome').value || '').trim() || (sel ? sel.dataset.op : '');
         if (!nome) return X.toast('Scegli o scrivi un nome.', 'err');
-        X.set('operatore', nome.slice(0, 60)); chiudiDlg(); render();
+        X.set('operatore', X.ricordaNome(nome)); chiudiDlg(); render();
         var poi = S.dopoOp; S.dopoOp = null; if (poi) poi();
         return;
       }
@@ -426,6 +426,7 @@
   dlg.addEventListener('click', function (ev) { if (ev.target === dlg) chiudiDlg(); });
   window.matchMedia('(max-width:820px)').addEventListener('change', render);
 
+  X.aiuto('Come si usa la cassa', ['Tocca i prodotti per metterli nello scontrino; con − e + cambi le quantità.', 'Scegli Contanti o Carta. Con Contanti il tastierino calcola il resto.', 'Se hai sbagliato, tocca Annulla nel messaggio verde subito dopo la vendita (oppure dalla scheda Oggi).', 'Omaggio / consumo staff: per ciò che non si paga; conta nei consumi ma non entra in cassa.', 'Senza rete funziona lo stesso: in alto vedi quante vendite aspettano di essere inviate.', 'A fine serata: Chiudi cassa, conta i contanti e conferma.']);
   X.avvia('bar', {
     onStato: suStato,
     onChiave: function () { X.salvaChiave(''); setup(); },
