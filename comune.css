@@ -100,3 +100,4 @@ dialog::backdrop{background:rgba(13,11,9,.55)}
 .applink{display:flex;flex-direction:column;gap:4px;padding:16px;border-radius:14px;background:var(--sup2);text-decoration:none;color:var(--ink);border:1px solid var(--linea)}
 .applink b{font:700 18px/1.2 var(--display)}
 .applink span{color:var(--muted);font-size:14px}
+@media (max-width:560px){.appbtn,.aiutobtn{width:38px;height:38px}.chip{height:38px;padding:0 12px}.tabs{top:58px}}
