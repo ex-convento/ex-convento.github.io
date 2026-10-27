@@ -92,13 +92,13 @@
   };
   var S = {vista: 'stato', giorno: new Date().getDate(), srv: null};
 
-  function colForno(t) { t = t.toUpperCase(); return t.indexOf('BLU') >= 0 ? '#2f6f9a' : t.indexOf('ROSSO') >= 0 ? '#b33f28' : t.indexOf('GRANDE') >= 0 ? '#94660a' : '#4f4a42'; }
+  function colForno(t) { t = t.toUpperCase(); return t.indexOf('BLU') >= 0 ? '#2f6f9a' : t.indexOf('ROSSO') >= 0 ? '#b33f28' : t.indexOf('GRANDE') >= 0 ? '#94660a' : t.indexOf('BIANCO') >= 0 ? '#7d8a83' : '#4f4a42'; }
   function nomeForno(t) { return t.replace(/^FORNO\s+/i, 'Forno ').replace(/\b(\w)(\w*)/g, function (m, a, b) { return a + b.toLowerCase(); }).replace(/^Forno/, 'Forno'); }
   var PUB = X.pubblico();
   function operatore() { return PUB ? (S.opTemp || '') : X.get('operatore', ''); }
   function dimentica() { if (PUB) setTimeout(function () { S.opTemp = ''; render(); }, 0); }
   function locali() { return X.get('eventi', []); }
-  function tabs() { return (S.srv && S.srv.forni && S.srv.forni.tabs) || ['FORNO BLU', 'FORNO ROSSO', 'FORNO GRANDE']; }
+  function tabs() { return (S.srv && S.srv.forni && S.srv.forni.tabs) || ['FORNO BLU', 'FORNO ROSSO', 'FORNO GRANDE', 'FORNO BIANCO']; }
 
   /* ---------- tabella temperature e misure dei forni (dal foglio PRENOTAZIONI) ---------- */
   function info() {
