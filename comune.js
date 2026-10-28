@@ -96,6 +96,95 @@
     };
   };
 
+  /* ---------- scorte (bar e laboratorio): conteggio, arrivi, uso; senza PIN, finiscono in coda come il resto ---------- */
+  // o = {reparti: ['Bar', ...], operatore: fn() -> nome, chiediOp: fn(poi), dopo: fn() per ridisegnare}
+  var SC = null;
+  function numIt(v) { var n = Number(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) ? n : NaN; }
+  function fmtQ(n) { n = Math.round(Number(n || 0) * 100) / 100; return String(n).replace('.', ','); }
+  X.scorteInit = function (o) { SC = o; };
+  X.scorte = function () {
+    var st = X.stato() || {}, l = (st.scorte && st.scorte.ok ? st.scorte.values : []) || [];
+    var m = {}; l = l.filter(function (x) { return !SC || SC.reparti.indexOf(x.reparto) >= 0; }).map(function (x) { var c = {}; Object.keys(x).forEach(function (n) { c[n] = x[n]; }); m[c.id] = c; c.inAttesa = 0; return c; });
+    X.coda().forEach(function (it) {
+      var x = it.tipo === 'scorta' && m[it.scorta]; if (!x) return;
+      var v = Number(it.valore) || 0; x.quantita = it.modo === 'carico' ? x.quantita + v : it.modo === 'uso' ? Math.max(0, x.quantita - v) : v;
+      x.bassa = x.quantita <= x.soglia; x.inAttesa++;
+    });
+    return l;
+  };
+  X.vScorte = function (filtro) {
+    var tutte = X.scorte(), rep = SC ? SC.reparti : [];
+    if (!(X.stato() || {}).scorte) return '<div class="wrap scw"><div class="card vuota">Le scorte arrivano al prossimo collegamento con il gestionale.</div></div>';
+    var lista = tutte.filter(function (x) { return !filtro || x.reparto === filtro; }).sort(function (a, b) { return (b.bassa ? 1 : 0) - (a.bassa ? 1 : 0) || a.nome.localeCompare(b.nome); });
+    var basse = tutte.filter(function (x) { return x.bassa; });
+    var h = '<div class="wrap scw">';
+    if (basse.length) h += '<div class="card scbuy"><h3>Da comprare (' + basse.length + ')</h3><p>' + basse.map(function (x) { return '<b>' + X.esc(x.nome) + '</b>' + (x.riordino ? ' · circa ' + fmtQ(x.riordino) + ' ' + X.esc(x.unita) : ''); }).join('<br>') + '</p><p class="muted" style="margin:6px 0 0;font-size:14px">Il direttivo riceve l’avviso da solo. Quando arriva la spesa, tocca <b>Arrivati</b>.</p></div>';
+    if (rep.length > 1) h += '<div class="scelte scfil">' + [['', 'Tutte']].concat(rep.map(function (r) { return [r, r]; })).map(function (r) { return '<button class="scelta' + ((filtro || '') === r[0] ? ' on' : '') + '" data-skr="' + X.esc(r[0]) + '">' + X.esc(r[1]) + '</button>'; }).join('') + '</div>';
+    if (!lista.length) h += '<div class="card vuota">Nessuna scorta' + (filtro ? ' in ' + X.esc(filtro) : '') + '. Le scorte nuove si aggiungono dal gestionale (sezione Scorte).</div>';
+    h += '<div class="sclist">' + lista.map(function (x) {
+      var info = [];
+      if (x.bassa) info.push('<span class="badge ros">Sta finendo</span>');
+      if (x.giorni != null && !x.bassa) info.push('<span class="muted">basta per circa ' + x.giorni + (x.giorni === 1 ? ' giorno' : ' giorni') + '</span>');
+      if (x.inAttesa) info.push('<span class="badge ara">in invio</span>');
+      if (!filtro && rep.length > 1) info.push('<span class="muted">' + X.esc(x.reparto) + '</span>');
+      return '<article class="scr' + (x.bassa ? ' bassa' : '') + '"><div class="scn"><b>' + X.esc(x.nome) + '</b><div class="sci">' + info.join(' ') + '</div></div>' +
+        '<div class="scq"><b>' + fmtQ(x.quantita) + '</b><span>' + X.esc(x.unita) + '</span><small>avviso sotto ' + fmtQ(x.soglia) + '</small></div>' +
+        '<div class="sca"><button class="btn lin" data-sk="' + X.esc(x.id) + '" data-skm="uso" aria-label="Usati: ' + X.esc(x.nome) + '">− Usati</button><button class="btn lin" data-sk="' + X.esc(x.id) + '" data-skm="carico" aria-label="Arrivati: ' + X.esc(x.nome) + '">+ Arrivati</button><button class="btn prim" data-sk="' + X.esc(x.id) + '" data-skm="conteggio">Conta</button></div></article>';
+    }).join('') + '</div></div>';
+    return h;
+  };
+  function scDlg() {
+    var d = document.getElementById('scDlg');
+    if (!d) { d = document.createElement('dialog'); d.id = 'scDlg'; document.body.appendChild(d); d.addEventListener('click', function (e) { if (e.target === d || e.target.closest('[data-chiudi]')) d.close(); }); }
+    return d;
+  }
+  function scApri(id, modo) {
+    var x = X.scorte().filter(function (y) { return y.id === id; })[0]; if (!x) return X.toast('Scorta non trovata: aggiorna la pagina.', 'err');
+    var t = {conteggio: ['Quanti ne restano?', 'Conta quello che c’è adesso e scrivi il numero.', 'Salva il conteggio'], carico: ['Quanti ne sono arrivati?', 'Si sommano a quelli che ci sono.', 'Aggiungi'], uso: ['Quanti ne hai usati?', 'Si tolgono da quelli che ci sono.', 'Togli']}[modo];
+    var d = scDlg();
+    d.innerHTML = '<div class="dlg-h"><h2>' + X.esc(x.nome) + '</h2><button class="dlg-x" data-chiudi aria-label="Chiudi">×</button></div><div class="dlg-b">' +
+      '<p class="muted" style="margin:0 0 4px">Adesso: <b>' + fmtQ(x.quantita) + ' ' + X.esc(x.unita) + '</b> · ' + t[1] + '</p>' +
+      '<label class="campo"><span>' + t[0] + ' (' + X.esc(x.unita) + ')</span><div class="scstep"><button type="button" class="btn lin" data-skd="-1" aria-label="Meno uno">−</button><input id="scV" inputmode="decimal" autocomplete="off" value="' + (modo === 'conteggio' ? fmtQ(x.quantita) : '') + '" placeholder="0"><button type="button" class="btn lin" data-skd="1" aria-label="Più uno">+</button></div></label>' +
+      '<p id="scDopo" class="muted" style="margin:0 0 6px;min-height:1.4em"></p>' +
+      '<label class="campo"><span>Note</span><input id="scN" maxlength="150" placeholder="' + (modo === 'carico' ? 'es. spesa Metro' : 'facoltative') + '"></label>' +
+      '<button class="btn prim full big" data-skok="' + X.esc(id) + '" data-skm="' + modo + '">' + t[2] + '</button></div>';
+    d.showModal();
+    var i = document.getElementById('scV'); scPrev(x, modo); i.addEventListener('input', function () { scPrev(x, modo); });
+    setTimeout(function () { i.focus(); i.select(); }, 60);
+  }
+  function scPrev(x, modo) {
+    var v = numIt(document.getElementById('scV').value), el = document.getElementById('scDopo'); if (!el) return;
+    if (isNaN(v) || document.getElementById('scV').value === '') { el.textContent = ''; return; }
+    var n = modo === 'carico' ? x.quantita + v : modo === 'uso' ? Math.max(0, x.quantita - v) : v;
+    el.innerHTML = 'Dopo: <b>' + fmtQ(n) + ' ' + X.esc(x.unita) + '</b>' + (n <= x.soglia ? ' · <span style="color:var(--rosso)">sotto la soglia, finisce in “Da comprare”</span>' : '');
+  }
+  function scSalva(id, modo) {
+    var raw = document.getElementById('scV').value, v = numIt(raw);
+    if (raw === '' || isNaN(v) || v < 0) return X.toast('Scrivi un numero (anche 0).', 'err');
+    if (modo !== 'conteggio' && v === 0) return X.toast('Scrivi quanti.', 'err');
+    var x = X.scorte().filter(function (y) { return y.id === id; })[0]; if (!x) return;
+    var op = SC && SC.operatore ? SC.operatore() : '';
+    var fai = function () {
+      X.accoda({tipo: 'scorta', scorta: id, modo: modo, valore: Math.round(v * 100) / 100, note: (document.getElementById('scN') || {}).value ? document.getElementById('scN').value.trim().slice(0, 150) : '', operatore: (SC && SC.operatore ? SC.operatore() : ''), quando: X.adesso()});
+      var d = document.getElementById('scDlg'); if (d && d.open) d.close();
+      X.toast(x.nome + ': ' + (modo === 'conteggio' ? 'ne restano ' + fmtQ(v) : (modo === 'carico' ? '+' : '−') + fmtQ(v)) + ' ' + x.unita, 'ok');
+      if (SC && SC.dopo) SC.dopo();
+    };
+    if (!op && SC && SC.chiediOp) { var d0 = document.getElementById('scDlg'); var nota = (document.getElementById('scN') || {}).value || ''; if (d0 && d0.open) d0.close(); return SC.chiediOp(function () { scApri(id, modo); document.getElementById('scV').value = fmtQ(v); document.getElementById('scN').value = nota; scPrev(x, modo); }); }
+    fai();
+  }
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest('button'); if (!t || !SC) return;
+    var d = t.dataset;
+    if (d.skr !== undefined) { SC.filtro = d.skr; if (SC.dopo) SC.dopo(); return; }
+    if (d.skok) return scSalva(d.skok, d.skm);
+    if (d.sk) return scApri(d.sk, d.skm);
+    if (d.skd) { var i = document.getElementById('scV'), v = numIt(i.value); v = (isNaN(v) ? 0 : v) + Number(d.skd); i.value = fmtQ(Math.max(0, v)); i.dispatchEvent(new Event('input')); }
+  });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target && ev.target.id === 'scV') { var b = document.querySelector('[data-skok]'); if (b) b.click(); } });
+  X.scorteFiltro = function () { return SC ? SC.filtro || '' : ''; };
+  X.scorteBasse = function () { return X.scorte().filter(function (x) { return x.bassa; }).length; };
+
   /* ---------- chiave della postazione ---------- */
   X.chiave = function () { try { return localStorage.getItem(k('chiave')) || localStorage.getItem('excv_k') || ''; } catch (e) { return ''; } };
   X.salvaChiave = function (c) { try { if (c) localStorage.setItem(k('chiave'), c); else localStorage.removeItem(k('chiave')); } catch (e) {} };

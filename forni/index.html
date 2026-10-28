@@ -112,6 +112,7 @@
   <button class="tab" data-v="pren">Prenotazioni</button>
   <button class="tab" data-v="temp">Temperature</button>
   <button class="tab" data-v="storico">Storico</button>
+  <button class="tab" data-v="scorte" id="tabScorte">Scorte</button>
 </nav>
 <main id="app"></main>
 <dialog id="dlg"></dialog>
@@ -217,7 +218,9 @@
     if (S.vista === 'stato') a.innerHTML = vStato();
     else if (S.vista === 'pren') a.innerHTML = vPren();
     else if (S.vista === 'temp') a.innerHTML = vTemp();
+    else if (S.vista === 'scorte' && !PUB) a.innerHTML = X.vScorte(X.scorteFiltro());
     else a.innerHTML = vStorico();
+    var ts = $('#tabScorte'); if (ts) { ts.style.display = PUB ? 'none' : ''; var nb = X.scorteBasse(); ts.innerHTML = 'Scorte' + (nb ? ' <span class="badge ros">' + nb + '</span>' : ''); }
   }
   function vStato() {
     var oggi = new Date().getDate();
@@ -516,14 +519,15 @@
   });
   dlg.addEventListener('click', function (ev) { if (ev.target === dlg) chiudiDlg(); });
 
-  X.aiuto('Come si usano i forni', ['Ogni scheda è un forno: vedi se è libero, caricato, in cottura o in raffreddamento, da quanto e chi l’ha usato.', 'Carica il forno → Avvia cottura → Fine cottura → Scaricato: ogni passaggio resta registrato con il tuo nome.', 'Hai toccato il pulsante sbagliato? Tocca Annulla nel messaggio verde.', 'Prenotazioni: scegli il giorno, poi tocca i posti nel disegno del forno (mezzo forno, ripiano, oggetti) o "Forno intero". Il prezzo si calcola da solo.', 'Incassa infornata registra il pagamento nella cassa dell’associazione.', 'Senza rete funziona lo stesso: le operazioni partono quando torna la connessione.']);
+  X.aiuto('Come si usano i forni', ['Ogni scheda è un forno: vedi se è libero, caricato, in cottura o in raffreddamento, da quanto e chi l’ha usato.', 'Carica il forno → Avvia cottura → Fine cottura → Scaricato: ogni passaggio resta registrato con il tuo nome.', 'Hai toccato il pulsante sbagliato? Tocca Annulla nel messaggio verde.', 'Prenotazioni: scegli il giorno, poi tocca i posti nel disegno del forno (mezzo forno, ripiano, oggetti) o "Forno intero". Il prezzo si calcola da solo.', 'Incassa infornata registra il pagamento nella cassa dell’associazione.', 'Senza rete funziona lo stesso: le operazioni partono quando torna la connessione.', 'Scheda Scorte (laboratorio e forni): Conta quando controlli quanto resta, + Arrivati quando arriva il materiale, − Usati quando lo prendi. Sotto la soglia il direttivo riceve l’avviso.']);
+  if (!PUB) X.scorteInit({reparti: ['Laboratorio', 'Forni'], operatore: operatore, chiediOp: function (poi) { scegliOperatore(poi); }, dopo: function () { if (S.vista === 'scorte') render(); }});
   X.avvia('forni', {
     onStato: function (s) {
       S.srv = s;
       var srvIds = {}; ((s.forni && s.forni.storico) || []).forEach(function (e) { srvIds[e.id] = 1; });
       var inCoda = X.coda().map(function (c) { return c.id; });
       X.set('eventi', locali().filter(function (e) { return inCoda.indexOf(e.id) >= 0 || !srvIds[e.id]; }).slice(-80));
-      if (!dlg.open) render();
+      if (!dlg.open && !document.querySelector('#scDlg[open]')) render();
     },
     onChiave: function () { X.salvaChiave(''); setup(); },
     onTick: function () { if (!dlg.open && S.vista === 'stato') render(); }

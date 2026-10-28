@@ -107,6 +107,7 @@
   <button class="tab on" data-v="cassa">Cassa</button>
   <button class="tab" data-v="oggi">Oggi</button>
   <button class="tab" data-v="chiudi">Chiudi cassa</button>
+  <button class="tab" data-v="scorte">Scorte</button>
   <button class="tab" data-v="listino">Listino</button>
 </nav>
 <div id="app" class="main"></div>
@@ -156,7 +157,7 @@
     applicaCassa();
     S.operatori = s.operatori || [];
     S.postazione = s.postazione || '';
-    if (S.vista === 'cassa' || (S.vista === 'listino' && !document.querySelector('#lstBody'))) render();
+    if (S.vista === 'cassa' || (S.vista === 'scorte' && !document.querySelector('#scDlg[open]')) || (S.vista === 'listino' && !document.querySelector('#lstBody'))) render();
   }
 
   /* ---------- carrello ---------- */
@@ -185,7 +186,9 @@
     if (S.vista === 'cassa') a.innerHTML = vCassa();
     else if (S.vista === 'oggi') a.innerHTML = vOggi();
     else if (S.vista === 'chiudi') a.innerHTML = vChiudi();
+    else if (S.vista === 'scorte') a.innerHTML = X.vScorte(X.scorteFiltro());
     else a.innerHTML = vListino();
+    var nb = X.scorteBasse(), tb = document.querySelector('#viste [data-v="scorte"]'); if (tb) tb.innerHTML = 'Scorte' + (nb ? ' <span class="badge ros">' + nb + '</span>' : '');
     if (S.vista === 'cassa') $('#barra').innerHTML = S.carrello.length
       ? '<div class="info">' + pezzi() + (pezzi() === 1 ? ' articolo' : ' articoli') + '<b>' + X.euro(totale()) + '</b></div><button class="btn amb" data-act="scontrino">Incassa ›</button>'
       : '<div class="info muted" style="color:#cfc6b6">Tocca i prodotti per aggiungerli</div>';
@@ -196,7 +199,7 @@
   function vCassa() {
     var gs = gruppi(), h = '<section class="prod">', ce = cassaEv();
     if (ce) h += '<div class="evbanner"><b>' + X.esc(ce.nome) + '</b><span>Cassa evento' + (ce.data ? ' del ' + ce.data.slice(8) + '/' + ce.data.slice(5, 7) : '') + ': prezzi dell\'evento, incassi in EVENTI.</span><button class="btn lin" data-act="casse" style="min-height:40px;color:#fff;border-color:#3a362f">Cambia cassa</button></div>';
-    if ((S.scorteBasse || []).length) h += '<div class="avviso"><span>Sta finendo: ' + S.scorteBasse.map(function (x) { return X.esc(x.nome) + ' (' + String(x.quantita).replace('.', ',') + ' ' + X.esc(x.unita) + ')'; }).join(', ') + '</span></div>';
+    if ((S.scorteBasse || []).length) h += '<div class="avviso"><span>Sta finendo: ' + S.scorteBasse.map(function (x) { return X.esc(x.nome) + ' (' + String(x.quantita).replace('.', ',') + ' ' + X.esc(x.unita) + ')'; }).join(', ') + '</span><button class="btn amb" data-v-go="scorte" style="min-height:42px">Apri scorte</button></div>';
     if (S.esempio && !ce) h += '<div class="avviso">Prodotti e prezzi di esempio: aggiorna il listino prima di usare la cassa. <button class="btn amb" data-v-go="listino" style="min-height:42px">Apri listino</button></div>';
     if (!S.listino.length) h += '<div class="card vuota">' + (ce ? 'Il listino di questo evento è vuoto. <button class="btn amb" data-v-go="listino" style="min-height:42px;margin-left:8px">Prepara il listino</button>' : 'Il listino non è ancora arrivato. Serve un attimo di rete la prima volta.') + '</div>';
     if (gs.length > 1) h += '<div class="scelte" style="margin-bottom:12px">' + ['Tutti'].concat(gs).map(function (g) { return '<button class="scelta' + (S.gruppo === g ? ' on' : '') + '" data-g="' + X.esc(g) + '">' + X.esc(g) + '</button>'; }).join('') + '</div>';
@@ -553,7 +556,8 @@
   dlg.addEventListener('click', function (ev) { if (ev.target === dlg) chiudiDlg(); });
   window.matchMedia('(max-width:820px)').addEventListener('change', render);
 
-  X.aiuto('Come si usa la cassa', ['In alto a destra scegli la cassa: Bar di tutti i giorni oppure la cassa di un evento, con prezzi suoi e piatti del giorno.', 'Tocca i prodotti per metterli nello scontrino; con − e + cambi le quantità.', 'Scegli Contanti o Carta. Con Contanti il tastierino calcola il resto.', 'Se hai sbagliato, tocca Annulla nel messaggio verde subito dopo la vendita (oppure dalla scheda Oggi).', 'Omaggio / consumo staff: per ciò che non si paga; conta nei consumi ma non entra in cassa.', 'Senza rete funziona lo stesso: in alto vedi quante vendite aspettano di essere inviate.', 'A fine serata: Chiudi cassa, conta i contanti e conferma.']);
+  X.aiuto('Come si usa la cassa', ['In alto a destra scegli la cassa: Bar di tutti i giorni oppure la cassa di un evento, con prezzi suoi e piatti del giorno.', 'Tocca i prodotti per metterli nello scontrino; con − e + cambi le quantità.', 'Scegli Contanti o Carta. Con Contanti il tastierino calcola il resto.', 'Se hai sbagliato, tocca Annulla nel messaggio verde subito dopo la vendita (oppure dalla scheda Oggi).', 'Omaggio / consumo staff: per ciò che non si paga; conta nei consumi ma non entra in cassa.', 'Senza rete funziona lo stesso: in alto vedi quante vendite aspettano di essere inviate.', 'A fine serata: Chiudi cassa, conta i contanti e conferma.', 'Scheda Scorte: Conta quando fai l’inventario, + Arrivati quando arriva la spesa, − Usati per ciò che si prende fuori dalle vendite. Le bevande collegate al listino scendono da sole a ogni vendita.']);
+  X.scorteInit({reparti: ['Bar', 'Pulizie e sede'], operatore: operatore, chiediOp: function (poi) { scegliOperatore(poi); }, dopo: function () { if (S.vista === 'scorte') render(); }});
   X.avvia('bar', {
     onStato: suStato,
     onChiave: function () { X.salvaChiave(''); setup(); },
