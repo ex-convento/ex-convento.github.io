@@ -63,6 +63,23 @@
   .resto{display:flex;justify-content:space-between;align-items:baseline;background:var(--verde-soft);color:var(--verde);border-radius:var(--r-sm);padding:14px 16px;font:700 26px/1 var(--display)}
   .resto.no{background:var(--rosso-soft);color:var(--rosso)}
   .resto span:first-child{font-size:16px}
+  /* Pagamento in contanti: su telefono tutto in colonna (conferma subito sotto il resto), su tablet in due colonne */
+  .pagaC{display:flex;flex-direction:column}
+  .pagaC .pcSx{display:flex;flex-direction:column;gap:10px}
+  .pagaC #resto:empty{display:none}
+  .pagaC .tasti{margin:12px 0 0}
+  @media (min-width:700px){
+    dialog[data-k="contanti"]{width:min(780px,calc(100vw - 24px))}
+    .pagaC{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+    .pagaC .tasti{margin:0}
+  }
+  @media (max-height:700px){
+    .tasti{gap:6px}
+    .tasti button{min-height:46px;font-size:18px}
+    .resto{padding:10px 14px;font-size:22px}
+    dialog[data-k="contanti"] .dlg-h{padding:10px 16px 2px}
+    dialog[data-k="contanti"] .dlg-b{padding:6px 16px 14px}
+  }
 
   .pann{padding:16px;max-width:900px;margin:0 auto;width:100%}
   .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
@@ -389,11 +406,11 @@
     }
     S.ricevuto = '';
     var t = totale(), tagli = [5, 10, 20, 50].filter(function (x) { return x >= t; }).slice(0, 3);
-    apri('contanti', 'Pagamento in contanti', '<div class="resto"><span>Totale</span><span>' + X.euro(t) + '</span></div>' +
-      '<p class="muted" style="margin:12px 0 6px">Quanto ti hanno dato?</p><div class="scelte"><button class="scelta" data-ric="' + t + '">Esatto</button>' +
+    apri('contanti', 'Pagamento in contanti', '<div class="pagaC"><div class="pcSx"><div class="resto"><span>Totale</span><span>' + X.euro(t) + '</span></div>' +
+      '<p class="muted" style="margin:10px 0 6px">Quanto ti hanno dato?</p><div class="scelte"><button class="scelta" data-ric="' + t + '">Esatto</button>' +
       tagli.map(function (x) { return '<button class="scelta" data-ric="' + x + '">' + x + ' €</button>'; }).join('') + '</div>' +
-      '<div class="tasti">' + ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'].map(function (c) { return '<button data-tasto="' + c + '">' + c + '</button>'; }).join('') + '</div>' +
-      '<div id="resto"></div><button class="btn ver big full" data-act="confContanti" style="margin-top:12px">Conferma vendita</button>');
+      '<div id="resto"></div><button class="btn ver big full" data-act="confContanti">Conferma vendita</button></div>' +
+      '<div class="tasti">' + ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'].map(function (c) { return '<button data-tasto="' + c + '">' + c + '</button>'; }).join('') + '</div></div>');
     aggiornaResto();
   }
   function aggiornaResto() {
