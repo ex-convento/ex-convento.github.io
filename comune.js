@@ -314,4 +314,18 @@
     timer = setInterval(function () { stato(); X.sync(); if (opts.onTick) opts.onTick(); }, 20000);
     if (X.chiave()) X.sync(true);
   };
+
+  /* Invio (tasto blu della tastiera) in un campo di testo: chiude la tastiera; se il campo ha data-invio, preme quel pulsante */
+  document.addEventListener('keydown', function (ev) {
+    var t = ev.target;
+    if (ev.key !== 'Enter' || !t || t.tagName !== 'INPUT' || t.id === 'scV') return;
+    ev.preventDefault();
+    var sel = t.getAttribute('data-invio');
+    t.blur();
+    if (sel) { var b = document.querySelector(sel); if (b) setTimeout(function () { b.click(); }, 50); }
+  });
+  document.addEventListener('focusin', function (ev) {
+    var t = ev.target;
+    if (t && t.tagName === 'INPUT' && !t.hasAttribute('enterkeyhint')) t.setAttribute('enterkeyhint', t.hasAttribute('data-invio') ? 'go' : 'done');
+  });
 })();

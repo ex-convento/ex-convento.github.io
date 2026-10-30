@@ -380,7 +380,7 @@
   function scegliOperatore(poi) {
     var h = '<p class="muted" style="margin-top:0">Tocca il tuo nome: vale per questa operazione e si azzera un minuto dopo.</p><div class="scelte">' +
       S.operatori.map(function (n) { return '<button class="scelta" data-op="' + X.esc(n) + '" style="min-height:56px;font-size:18px">' + X.esc(n) + '</button>'; }).join('') + '</div>' +
-      '<label class="campo"><span>' + (S.operatori.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" list="excvNomi" placeholder="Nome e cognome" autocomplete="off"></label>' +
+      '<label class="campo"><span>' + (S.operatori.length ? 'Oppure scrivi il nome' : 'Il tuo nome') + '</span><input id="opNome" list="excvNomi" placeholder="Nome e cognome" autocomplete="off" enterkeyhint="go" data-invio="[data-act=opOk]"></label>' +
       '<button class="btn prim full" data-act="opOk">Conferma</button>';
     S.dopoOp = poi || null;
     apri('operatore', 'Chi è al banco?', h);
