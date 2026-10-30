@@ -329,3 +329,91 @@
     if (t && t.tagName === 'INPUT' && !t.hasAttribute('enterkeyhint')) t.setAttribute('enterkeyhint', t.hasAttribute('data-invio') ? 'go' : 'done');
   });
 })();
+/* Posti dei forni: 4 ripiani (s1 in alto … s4 in basso) da 4 oggetti ciascuno = 16 posti (p1…p16).
+   Mezzo forno h1 = ripiani 1-2, h2 = ripiani 3-4. Prenotabili insieme fino a 2 mezzi forni, 4 ripiani o 16 oggetti.
+   Le prenotazioni vecchie (mezzo, ripiano, o1-o4) si leggono come h1, s3, p13-p16. */
+var FM = (function () {
+  var LEG = {mezzo: 'h1', ripiano: 's3', o1: 'p13', o2: 'p14', o3: 'p15', o4: 'p16'};
+  function range(a, b) { var o = []; for (var i = a; i <= b; i++) o.push(i); return o; }
+  function norm(posti) {
+    var out = [];
+    (posti || []).forEach(function (x) {
+      x = String(x).trim(); x = LEG[x] || x;
+      if ((x === 'intero' || /^h[12]$/.test(x) || /^s[1-4]$/.test(x) || /^p([1-9]|1[0-6])$/.test(x)) && out.indexOf(x) < 0) out.push(x);
+    });
+    return out.indexOf('intero') >= 0 ? ['intero'] : out;
+  }
+  function unita(x) {
+    if (x === 'intero') return range(1, 16);
+    var n = Number(x.slice(1));
+    if (x.charAt(0) === 'h') return range(n * 8 - 7, n * 8);
+    if (x.charAt(0) === 's') return range(n * 4 - 3, n * 4);
+    return [n];
+  }
+  function unitaDi(posti) { var o = []; norm(posti).forEach(function (x) { unita(x).forEach(function (u) { if (o.indexOf(u) < 0) o.push(u); }); }); return o; }
+  /* posto (1-16) -> prenotazione che lo occupa */
+  function occupa(lista) { var o = {}; (lista || []).forEach(function (r) { unitaDi(r.posti).forEach(function (u) { o[u] = r; }); }); return o; }
+  function liberi(o) { var n = 0; for (var u = 1; u <= 16; u++) if (!o[u]) n++; return n; }
+  function conta(posti) {
+    var c = {intero: 0, h: 0, s: 0, p: 0};
+    norm(posti).forEach(function (x) { if (x === 'intero') c.intero = 1; else c[x.charAt(0)]++; });
+    return c;
+  }
+  /* sceglie i posti liberi per q mezzi forni ('h'), ripiani ('s') o oggetti ('p'), oppure il forno intero */
+  function alloca(o, tipo, q) {
+    var occ = {}, u, k, out = [];
+    for (u = 1; u <= 16; u++) if (o[u]) occ[u] = 1;
+    var libero = function (a) { return a.every(function (x) { return !occ[x]; }); };
+    var prendi = function (a) { a.forEach(function (x) { occ[x] = 1; }); };
+    if (tipo === 'intero') return liberi(occ) === 16 ? ['intero'] : null;
+    for (k = 0; k < q; k++) {
+      var scelto = null;
+      if (tipo === 'h') { [1, 2].forEach(function (n) { if (!scelto && libero(unita('h' + n))) scelto = 'h' + n; }); }
+      else if (tipo === 's') {
+        var cand = [4, 3, 2, 1].filter(function (n) { return libero(unita('s' + n)); });
+        cand.sort(function (a, b) { var pa = libero(unita('s' + (a % 2 ? a + 1 : a - 1))) ? 1 : 0, pb = libero(unita('s' + (b % 2 ? b + 1 : b - 1))) ? 1 : 0; return pa - pb || b - a; });
+        if (cand.length) scelto = 's' + cand[0];
+      } else {
+        var best = null, bs = 9;
+        for (u = 16; u >= 1; u--) {
+          if (occ[u]) continue;
+          var sh = Math.ceil(u / 4), h = Math.ceil(u / 8);
+          var s = !libero(unita('s' + sh)) ? 0 : !libero(unita('h' + h)) ? 1 : 2;
+          if (s < bs) { bs = s; best = u; }
+        }
+        if (best) scelto = 'p' + best;
+      }
+      if (!scelto) return null;
+      prendi(unita(scelto)); out.push(scelto);
+    }
+    return out;
+  }
+  function prezzo(l, posti) {
+    if (!l) return null; var c = conta(posti);
+    if (c.intero) return l.intero == null ? null : Number(l.intero);
+    var tot = c.h * (Number(l.mezzo) || 0) + c.s * (Number(l.ripiano) || 0) + c.p * (Number(l.oggetto) || 0);
+    return Math.round(tot * 100) / 100;
+  }
+  function etichetta(posti) {
+    var c = conta(posti);
+    if (c.intero) return 'forno intero';
+    return [c.h ? (c.h === 1 ? 'mezzo forno' : c.h + ' mezzi forni') : '', c.s ? c.s + (c.s === 1 ? ' ripiano' : ' ripiani') : '', c.p ? c.p + (c.p === 1 ? ' oggetto' : ' oggetti') : ''].filter(String).join(' + ');
+  }
+  /* righe del disegno: per ogni ripiano, segmenti di posti consecutivi liberi o della stessa prenotazione */
+  function righe(o) {
+    var out = [];
+    for (var s = 1; s <= 4; s++) {
+      var seg = [];
+      for (var u = s * 4 - 3; u <= s * 4; u++) {
+        var r = o[u] || null, last = seg[seg.length - 1];
+        if (last && r && last.r === r) last.n++;
+        else seg.push({r: r, n: 1, u: u});
+      }
+      out.push(seg);
+    }
+    return out;
+  }
+  var TIPI = [['p', 'Oggetti', 16], ['s', 'Ripiani', 4], ['h', 'Mezzi forni', 2]];
+  return {norm: norm, unitaDi: unitaDi, occupa: occupa, liberi: liberi, conta: conta, alloca: alloca, prezzo: prezzo, etichetta: etichetta, righe: righe, TIPI: TIPI};
+})();
+window.FM = FM;
