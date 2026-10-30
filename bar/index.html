@@ -178,6 +178,20 @@
   var dlg = $('#dlg');
 
   function vendite() { return X.get('vendite', []); }
+  /* vendite aperte arrivate da altri dispositivi della stessa postazione (dal server) */
+  function remoteRiga(r) {
+    var righe = [], re = /(-?\d+(?:\.\d+)?)× (.+?) (-?\d+\.\d{2})(?=, |$| \[)/g, m;
+    while ((m = re.exec(r.articoli || ''))) righe.push({q: Number(m[1]), nome: m[2], prezzo: Number(m[3])});
+    var mot = /\[([^\]:]+)(?::\s*([^\]]+))?\]$/.exec(r.articoli || '');
+    return {id: r.id, quando: r.quando, data: r.data, operatore: r.operatore, metodo: r.metodo, totale: Number(r.totale) || 0, righe: righe, evento: r.evento || '',
+      motivo: mot ? mot[1] : '', perChi: mot && mot[2] ? mot[2] : '', remoto: true, postazione: r.postazione || ''};
+  }
+  function remote() {
+    var loc = {}; vendite().forEach(function (v) { loc[v.id] = 1; });
+    var chiusi = X.get('chiusiRemoti', []);
+    return (S.remote || []).filter(function (v) { return !loc[v.id] && chiusi.indexOf(v.id) < 0; });
+  }
+  function tutteAperte() { return aperte().concat(remote().filter(stessaCassa)); }
   function salvaVendite(v) { var lim = X.oggi(new Date(Date.now() - 21 * 864e5)); X.set('vendite', v.filter(function (x) { return !x.chiusa || x.data >= lim; }).slice(-3000)); }
   // Chi è al banco vale per un'operazione: si sceglie al momento di incassare e si azzera un minuto dopo l'ultima operazione
   // (5 minuti se è stato scelto ma non si è ancora registrato niente). Così ogni vendita ha il nome giusto.
@@ -225,6 +239,17 @@
     applicaCassa();
     S.operatori = s.operatori || [];
     S.postazione = s.postazione || '';
+    if (s.venditeAperte && s.venditeAperte.ok) {
+      var ap = s.venditeAperte.values || [], ids = {};
+      ap.forEach(function (v) { ids[v.id] = 1; });
+      S.remote = ap.map(remoteRiga);  /* una sola cassa del bar: anche le vendite degli altri dispositivi */
+      X.set('chiusiRemoti', X.get('chiusiRemoti', []).filter(function (id) { return ids[id]; }));
+      // vendite di questo tablet già chiuse da un altro dispositivo o dalla chiusura automatica di mezzanotte
+      var coda = {}; X.coda().forEach(function (c) { coda[c.id] = 1; });
+      var lim = (s.generato || Date.now()) - 600000, lista = vendite(), cambiate = false;
+      lista.forEach(function (v) { if (!v.chiusa && !coda[v.id] && !ids[v.id] && Date.parse(v.quando) < lim) { v.chiusa = 'altrove'; cambiate = true; } });
+      if (cambiate) salvaVendite(lista);
+    }
     if (S.vista === 'cassa' || (S.vista === 'scorte' && !document.querySelector('#scDlg[open]')) || (S.vista === 'listino' && !document.querySelector('#lstBody'))) render();
   }
 
@@ -306,9 +331,9 @@
     return o;
   }
   function vOggi() {
-    var oggi = X.oggi(), lista = vendite().filter(function (v) { return v.data === oggi && stessaCassa(v); }), s = somme(lista), ce = cassaEv();
+    var oggi = X.oggi(), lista = vendite().concat(remote()).filter(function (v) { return v.data === oggi && stessaCassa(v); }).sort(function (a, b) { return a.quando < b.quando ? -1 : 1; }), s = somme(lista), ce = cassaEv();
     var top = Object.keys(s.prodotti).map(function (n) { return [n, s.prodotti[n]]; }).filter(function (x) { return x[1] > 0; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 6);
-    var h = '<section class="pann"><h2>Oggi su questo dispositivo' + (ce ? ' · ' + X.esc(ce.nome) : '') + '</h2><div class="kpi">' +
+    var h = '<section class="pann"><h2>Oggi al bar' + (ce ? ' · ' + X.esc(ce.nome) : '') + '</h2><div class="kpi">' +
       '<div class="card"><span class="muted">Incassato</span><b>' + X.euro(s.tot) + '</b></div>' +
       '<div class="card"><span class="muted">Contanti</span><b>' + X.euro(s.contanti) + '</b></div>' +
       '<div class="card"><span class="muted">Carta</span><b>' + X.euro(s.carta) + '</b></div>' +
@@ -321,18 +346,18 @@
     if (!lista.length) h += '<div class="vuota">Ancora nessuna vendita oggi.</div>';
     var coda = X.coda().map(function (c) { return c.id; });
     h += lista.slice().reverse().map(function (v) {
-      var annullabile = !v.chiusa && v.totale > 0 && !v.annullata;
+      var annullabile = !v.remoto && !v.chiusa && v.totale > 0 && !v.annullata;
       return '<div class="el' + (v.annullata ? ' ann' : '') + '"><div class="d"><b>' + X.esc(v.righe.map(function (r) { return r.q + '× ' + r.nome; }).join(', ')) + '</b>' +
         '<small>' + X.ora(v.quando) + ' · ' + (v.metodo === 'omaggio' ? '<span class="badge ara">' + X.esc((v.motivo || 'omaggio') + (v.perChi ? ': ' + v.perChi : '')) + '</span>' : v.metodo === 'carta' ? 'carta' : 'contanti') + ' · ' + X.esc(v.operatore || '') +
-        (coda.indexOf(v.id) >= 0 ? ' · <span class="badge ara">da inviare</span>' : ' · <span class="badge ver">salvato</span>') + (v.chiusa ? ' · chiusa' : '') + '</small></div>' +
+        (v.remoto ? ' · <span class="badge">' + X.esc(v.postazione && v.postazione !== S.postazione ? 'da ' + v.postazione : 'altro dispositivo') + '</span>' : coda.indexOf(v.id) >= 0 ? ' · <span class="badge ara">da inviare</span>' : ' · <span class="badge ver">salvato</span>') + (v.chiusa ? ' · chiusa' : '') + '</small></div>' +
         '<b>' + (v.metodo === 'omaggio' ? '0,00 €' : X.euro(v.totale)) + '</b>' + (annullabile ? '<button class="btn lin" data-ann="' + v.id + '" style="min-height:42px;padding:0 12px">Annulla</button>' : '') + '</div>';
     }).join('');
     return h + '</div></div></section>';
   }
   function vChiudi() {
-    var lista = aperte(), s = somme(lista), ce = cassaEv();
+    var lista = tutteAperte(), s = somme(lista), ce = cassaEv();
     var giorni = lista.map(function (v) { return v.data; }).filter(function (d, i, a) { return a.indexOf(d) === i; }).sort();
-    var h = '<section class="pann"><h2>' + (ce ? 'Chiusura cassa evento · ' + X.esc(ce.nome) : 'Chiusura cassa') + '</h2><p class="muted" style="margin-top:0">Vendite non ancora chiuse su questo dispositivo' + (ce ? ' per questo evento' : '') + (giorni.length ? ' (' + giorni.map(function (d) { return d.slice(8) + '/' + d.slice(5, 7); }).join(', ') + ')' : '') + '. ' + (ce ? 'Alla chiusura gli incassi vanno nel Flusso di Cassa in EVENTI, con il nome dell\'evento, e nel resoconto dell\'evento nel gestionale.' : 'Alla chiusura il gestionale scrive gli incassi nel Flusso di Cassa, divisi per categoria e metodo.') + '</p>' +
+    var h = '<section class="pann"><h2>' + (ce ? 'Chiusura cassa evento · ' + X.esc(ce.nome) : 'Chiusura cassa') + '</h2><p class="muted" style="margin-top:0">Vendite non ancora chiuse (tutti i dispositivi del bar)' + (ce ? ' per questo evento' : '') + (giorni.length ? ' (' + giorni.map(function (d) { return d.slice(8) + '/' + d.slice(5, 7); }).join(', ') + ')' : '') + '. ' + (ce ? 'Alla chiusura gli incassi vanno nel Flusso di Cassa in EVENTI, con il nome dell\'evento, e nel resoconto dell\'evento nel gestionale.' : 'Alla chiusura il gestionale scrive gli incassi nel Flusso di Cassa, divisi per categoria e metodo.') + '</p>' +
       '<div class="kpi"><div class="card"><span class="muted">Contanti attesi</span><b>' + X.euro(s.contanti) + '</b></div>' +
       '<div class="card"><span class="muted">Carta</span><b>' + X.euro(s.carta) + '</b></div>' +
       '<div class="card"><span class="muted">Scontrini</span><b>' + s.n + '</b></div>' +
@@ -447,13 +472,14 @@
   }
   function chiudiCassa() {
     if (!operatore()) return scegliOperatore(chiudiCassa);
-    var lista = vendite(), aperteL = lista.filter(function (v) { return !v.chiusa && stessaCassa(v); }); if (!aperteL.length) return;
+    var lista = vendite(), rem = remote().filter(function (v) { return stessaCassa(v) && v.data <= X.oggi(); }), aperteL = lista.filter(function (v) { return !v.chiusa && stessaCassa(v); }).concat(rem); if (!aperteL.length) return;
     var s = somme(aperteL), cont = ($('#contati') || {}).value || '', id = X.uuid(), oggi = X.oggi();
     var c = {tipo: 'chiusura', id: id, quando: X.adesso(), data: oggi, operatore: operatore(), contati: cont ? Number(cont.replace(',', '.')) : '', note: (($('#noteCh') || {}).value || '').slice(0, 300)};
     var ce = cassaEv();
     if (ce) { c.evento = ce.id; c.concludi = !!(($('#concludi') || {}).checked); }
     lista.forEach(function (v) { if (!v.chiusa && v.data <= oggi && stessaCassa(v)) v.chiusa = id; });
     salvaVendite(lista); X.accoda(c); segnaOperazione();
+    X.set('chiusiRemoti', X.get('chiusiRemoti', []).concat(rem.map(function (v) { return v.id; })).slice(-2000));
     var ch = X.get('chiusure', []); ch.push({id: id, data: oggi, operatore: c.operatore, totale: s.tot, evento: ce ? ce.nome : ''}); X.set('chiusure', ch.slice(-30));
     if (ce && c.concludi) { S.casseEventi = S.casseEventi.filter(function (x) { return x.id !== ce.id; }); S.cassa = ''; X.set('cassaAttiva', ''); applicaCassa(); }
     render(); X.toast((ce ? 'Cassa evento chiusa · ' : 'Cassa chiusa · ') + X.euro(s.tot), 'ok');
@@ -613,7 +639,7 @@
   });
   document.addEventListener('input', function (ev) {
     if (ev.target.id === 'contati') {
-      var s = somme(aperte()), v = Number(ev.target.value.replace(',', '.')), el = $('#diff');
+      var s = somme(tutteAperte()), v = Number(ev.target.value.replace(',', '.')), el = $('#diff');
       if (!ev.target.value || isNaN(v)) { el.textContent = ''; return; }
       var df = Math.round((v - s.contanti) * 100) / 100;
       el.textContent = df === 0 ? 'Il conto torna.' : (df > 0 ? 'Ci sono ' + X.euro(df) + ' in più.' : 'Mancano ' + X.euro(-df) + '.');
