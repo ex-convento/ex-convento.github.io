@@ -1,6 +1,6 @@
 /* Ex Convento · tiene in memoria le app Bar e Forni per aprirle anche senza rete */
-var V = 'excv-14';  /* cambiare numero a ogni aggiornamento delle app */
-var FILES = ['./', 'index.html', 'comune.js', 'comune.css', 'logo.png', 'icon-192.png', 'icon.png', 'apple-touch-icon.png',
+var V = 'excv-15';  /* cambiare numero a ogni aggiornamento delle app */
+var FILES = ['./', 'index.html', 'comune.js', 'comune.css', 'totore.js', 'logo.png', 'icon-192.png', 'icon.png', 'apple-touch-icon.png',
   'bar/', 'bar/index.html', 'bar/manifest.json', 'forni/', 'forni/index.html', 'forni/manifest.json',
   'pubblico/', 'pubblico/index.html', 'pubblico/manifest.json'];
 self.addEventListener('install', function (e) {
