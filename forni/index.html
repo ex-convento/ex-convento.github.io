@@ -101,6 +101,10 @@
   .zona.preso{border-style:solid;border-color:transparent;background:color-mix(in srgb,var(--fc) 82%,#000);color:#fff}
   .zona.preso small{color:rgba(255,255,255,.85)}
   .zona.preso.attesa{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--fc) 70%,#000) 0 10px,color-mix(in srgb,var(--fc) 55%,#000) 10px 20px)}
+  .zona.preso.ap{outline:2px dashed var(--ambra);outline-offset:-5px}
+  .ospnote{display:flex;gap:10px;align-items:flex-start;background:var(--ambra-soft);border:1px solid color-mix(in srgb,var(--ambra) 45%,transparent);border-radius:14px;padding:10px 14px;margin:0 0 12px;font-size:14.5px;line-height:1.35}
+  .ospnote b{display:block}
+  .linkdir{background:none;border:0;color:var(--muted);text-decoration:underline;font:inherit;font-size:14px;cursor:pointer;padding:8px 0}
   .zona.sel{border-style:solid;border-color:var(--ambra);background:var(--ambra-soft);box-shadow:0 0 0 3px color-mix(in srgb,var(--ambra) 35%,transparent)}
   .zona.sel b::before{content:"\2713  ";color:var(--ambra-ink)}
   .ovn.intero .zona.preso{border-radius:6px}
@@ -161,6 +165,8 @@
   function colForno(t) { t = t.toUpperCase(); return t.indexOf('BLU') >= 0 ? '#2f6f9a' : t.indexOf('ROSSO') >= 0 ? '#b33f28' : t.indexOf('GRANDE') >= 0 ? '#94660a' : t.indexOf('BIANCO') >= 0 ? '#7d8a83' : '#4f4a42'; }
   function nomeForno(t) { return t.replace(/^FORNO\s+/i, 'Forno ').replace(/\b(\w)(\w*)/g, function (m, a, b) { return a + b.toLowerCase(); }).replace(/^Forno/, 'Forno'); }
   var PUB = X.pubblico();
+  /* senza chiave l'app funziona per tutti: si prenota con nome e cognome (importi diversi dal listino da approvare) */
+  function osp() { return !X.chiave(); }
   function operatore() { return PUB ? (S.opTemp || '') : X.get('operatore', ''); }
   function dimentica() { if (PUB) setTimeout(function () { S.opTemp = ''; render(); }, 0); }
   function locali() { return X.get('eventi', []); }
@@ -226,8 +232,9 @@
   function daPagare() { var o = X.oggi(); return tutteMappa().filter(function (r) { return r.data <= o && !r.pagato && Number(r.prezzo) > 0; }).sort(function (a, b) { return a.data < b.data ? -1 : 1; }); }
   function dataIt(d) { return String(d).slice(8, 10) + '/' + String(d).slice(5, 7) + '/' + String(d).slice(0, 4); }
   function pagBadge(r) { return r.pagato === 'sì' ? '<span class="badge ver">' + (r.pagAttesa ? 'pagata · da inviare' : 'pagata') + '</span>' : r.pagato === 'in conferma' ? '<span class="badge ara">in conferma</span>' : Number(r.prezzo) > 0 && r.data <= X.oggi() ? '<span class="badge ros">da pagare</span>' : ''; }
+  function apBadge(r) { return r.approvazione === 'da approvare' ? ' <span class="badge ara">importo da approvare</span>' : ''; }
   function rigaInf(r, bottone) {
-    return '<div class="el"><span class="dot" style="background:' + colForno(r.forno) + '"></span><div class="d"><b>' + X.esc(dataIt(r.data) + ' · ' + r.nome) + '</b><small>' + X.esc(nomeForno(r.forno) + ' · ' + etichetta(r.posti) + (r.temperatura ? ' · ' + r.temperatura : '')) + ' ' + (bottone ? '' : pagBadge(r)) + '</small></div><b>' + (r.prezzo != null && r.prezzo !== '' ? X.euro(Number(r.prezzo)) : '') + '</b>' + (bottone || '') + '</div>';
+    return '<div class="el"><span class="dot" style="background:' + colForno(r.forno) + '"></span><div class="d"><b>' + X.esc(dataIt(r.data) + ' · ' + r.nome) + '</b><small>' + X.esc(nomeForno(r.forno) + ' · ' + etichetta(r.posti) + (r.temperatura ? ' · ' + r.temperatura : '')) + ' ' + (bottone ? '' : pagBadge(r)) + apBadge(r) + '</small></div><b>' + (r.prezzo != null && r.prezzo !== '' ? X.euro(Number(r.prezzo)) : '') + '</b>' + (bottone || '') + '</div>';
   }
   function vDaPagare() {
     var l = daPagare(), tot = 0; l.forEach(function (r) { tot += Number(r.prezzo) || 0; });
@@ -266,19 +273,21 @@
   /* ---------- viste ---------- */
   function render() {
     document.querySelectorAll('#viste .tab').forEach(function (t) { t.classList.toggle('on', t.dataset.v === S.vista); });
-    var op = operatore(), ob = $('#opBtn'); ob.textContent = op ? op : 'Chi sei?'; ob.classList.toggle('vuoto', !op); ob.style.display = PUB ? 'none' : '';
-    var tb = $('#torna'); if (tb) tb.style.display = PUB ? '' : 'none';
+    if (osp() && (S.vista === 'stato' || S.vista === 'scorte')) S.vista = 'pren';
+    var op = operatore(), ob = $('#opBtn'); ob.textContent = op ? op : 'Chi sei?'; ob.classList.toggle('vuoto', !op); ob.style.display = (PUB || osp()) ? 'none' : '';
+    var tb = $('#torna'); if (tb) { tb.style.display = (PUB || osp()) ? '' : 'none'; tb.textContent = (osp() && !PUB) ? '\u2039 Gestionale' : '\u2039 Torna all\'inizio'; tb.href = (osp() && !PUB) ? '../' : '../pubblico/'; }
+    ['stato'].forEach(function (v) { var b = $('#viste [data-v="' + v + '"]'); if (b) b.style.display = osp() ? 'none' : ''; });
     var a = $('#app'), oldG = a.querySelector('.giorni'); if (oldG) S.ggLeft = oldG.scrollLeft;
     if (S.vista === 'stato') a.innerHTML = vStato();
     else if (S.vista === 'dapagare') a.innerHTML = vDaPagare();
     else if (S.vista === 'pren') a.innerHTML = vPren();
     else if (S.vista === 'temp') a.innerHTML = vTemp();
-    else if (S.vista === 'scorte' && !PUB) a.innerHTML = X.vScorte(X.scorteFiltro());
+    else if (S.vista === 'scorte' && !PUB && !osp()) a.innerHTML = X.vScorte(X.scorteFiltro());
     else a.innerHTML = vStorico();
     var g = a.querySelector('.giorni');
     if (g) { if (S.ggLeft == null) { var on = g.querySelector('.gg.on'); if (on) g.scrollLeft = on.offsetLeft - g.offsetLeft - g.clientWidth / 2 + on.offsetWidth / 2; } else g.scrollLeft = S.ggLeft; }
     var nd = daPagare().length, td = $('#tabDaPagare'); if (td) td.innerHTML = 'Da pagare' + (nd ? ' <span class="badge ros">' + nd + '</span>' : '');
-    var ts = $('#tabScorte'); if (ts) { ts.style.display = PUB ? 'none' : ''; var nb = X.scorteBasse(); ts.innerHTML = 'Scorte' + (nb ? ' <span class="badge ros">' + nb + '</span>' : ''); }
+    var ts = $('#tabScorte'); if (ts) { ts.style.display = (PUB || osp()) ? 'none' : ''; var nb = X.scorteBasse(); ts.innerHTML = 'Scorte' + (nb ? ' <span class="badge ros">' + nb + '</span>' : ''); }
   }
   function vStato() {
     var oggi = new Date().getDate();
@@ -320,9 +329,9 @@
       if (m !== mPrec && i) h += '<span class="mese">' + m + '</span>'; mPrec = m;
       h += '<button class="gg' + (iso === S.dataSel ? ' on' : '') + (iso < X.oggi() ? ' pass' : '') + '" data-gd="' + iso + '"><small>' + (iso === X.oggi() ? 'oggi' : nomi[dt.getDay()]) + '</small><b>' + dt.getDate() + '</b></button>';
     });
-    h += '</div><div class="legenda"><span><i></i>Libero: tocca per prenotare</span><span><i class="p"></i>Prenotato</span></div><div class="pren">';
+    h += '</div>' + (osp() ? '<div class="ospnote"><div><b>Prenota con il tuo nome e cognome</b>Puoi cambiare l\'importo di ogni persona: se è diverso dal listino resta segnato <i>da approvare</i> finché il direttivo non lo conferma.</div></div>' : '') + '<div class="legenda"><span><i></i>Libero: tocca per prenotare</span><span><i class="p"></i>Prenotato</span></div><div class="pren">';
     h += tabs().map(cardForno).join('');
-    return h + '</div><p class="muted" style="font-size:14px">Ogni forno ha 4 ripiani da 4 oggetti: 2 mezzi forni = 4 ripiani = 16 oggetti. In una volta sola puoi prenotare per più persone, ognuna con i suoi posti e il suo importo. Chi prenota per primo decide la temperatura della cottura.</p></div>';
+    return h + '</div><p class="muted" style="font-size:14px">Ogni forno ha 4 ripiani da 4 oggetti: 2 mezzi forni = 4 ripiani = 16 oggetti. In una volta sola puoi prenotare per più persone, ognuna con i suoi posti e il suo importo. Chi prenota per primo decide la temperatura della cottura.</p>' + (osp() ? '<p><button class="linkdir" data-act="chiaveOsp">Sei del direttivo? Collega questo dispositivo come postazione</button></p>' : '') + '</div>';
   }
   function cardForno(t) {
     var data = S.dataSel, lista = mappa(t, data), o = FM.occupa(lista), tf = tempFissa(lista), mis = misura(t), lib = FM.liberi(o);
@@ -332,7 +341,7 @@
     FM.righe(o).forEach(function (seg, i) {
       if (i) c += '<div class="rip' + (i === 2 ? ' meta' : '') + '"></div>';
       c += '<div class="shelf">' + seg.map(function (g) {
-        if (g.r) return '<button class="zona preso' + (g.r.attesa ? ' attesa' : '') + '" style="grid-column:span ' + g.n + '" data-f="' + X.esc(t) + '" data-rid="' + X.esc(g.r.id) + '" data-z="1"><small>' + X.esc(g.r.nome) + '</small></button>';
+        if (g.r) return '<button class="zona preso' + (g.r.attesa ? ' attesa' : '') + (g.r.approvazione === 'da approvare' ? ' ap' : '') + '" style="grid-column:span ' + g.n + '" data-f="' + X.esc(t) + '" data-rid="' + X.esc(g.r.id) + '" data-z="1"><small>' + X.esc(g.r.nome) + '</small></button>';
         return '<button class="zona libera" data-f="' + X.esc(t) + '" data-z="1" aria-label="Posto libero"><span>+</span></button>';
       }).join('') + '</div>';
     });
@@ -354,6 +363,7 @@
     locali().forEach(function (e) { if (inCoda.indexOf(e.id) >= 0) { lista.push(e); ids[e.id] = 1; } });
     srv.forEach(function (e) { if (!ids[e.id]) lista.push(e); });
     lista.sort(function (a, b) { return String(b.quando) < String(a.quando) ? -1 : 1; });
+    if (osp()) return '<div class="wrap">' + storicoInfornate() + '</div>';
     var h = '<div class="wrap">' + storicoInfornate() + '<div class="card"><h2>Registro dei forni</h2>';
     if (!lista.length) h += '<div class="vuota">Ancora nessun movimento registrato.</div>';
     h += lista.slice(0, 60).map(function (e) {
@@ -379,7 +389,7 @@
     return '<div class="scelte" data-gruppo="' + nome + '">' + t.map(function (x) { return '<button type="button" class="scelta' + (x === sel ? ' on' : '') + '" data-sc="' + X.esc(x) + '">' + X.esc(x) + '</button>'; }).join('') + '</div>';
   }
   function valScelta(nome) { var b = document.querySelector('[data-gruppo="' + nome + '"] .scelta.on'); return b ? b.dataset.sc : ''; }
-  function chiedi(fn) { if (PUB) S.opTemp = ''; if (!operatore()) return scegliOperatore(fn); fn(); }
+  function chiedi(fn) { if (osp()) return fn(); if (PUB) S.opTemp = ''; if (!operatore()) return scegliOperatore(fn); fn(); }
   function scegliOperatore(poi) {
     var ops = PUB ? [] : ((S.srv && S.srv.operatori) || []), op = operatore();
     S.dopoOp = poi || null;
@@ -445,7 +455,7 @@
     apri('Incassa infornata', '<label class="campo"><span>Chi paga</span><input id="iChi" list="excvNomi" autocomplete="off" placeholder="Nome" value="' + X.esc(pre.nome || '') + '"></label>' +
       '<label class="campo"><span>Importo</span><input id="iImp" inputmode="decimal" placeholder="es. 15" value="' + (pre.importo != null ? String(pre.importo).replace('.', ',') : '') + '"></label>' +
       '<div class="campo"><span>Metodo</span><div class="scelte" data-gruppo="met"><button class="scelta on" data-sc="contanti">Contanti</button><button class="scelta" data-sc="carta">Carta</button></div></div>' +
-      '<button class="btn ver big full" data-act="confPaga" data-f="' + X.esc(t) + '">Registra incasso</button><p class="muted" style="font-size:14px">Finisce nel Flusso di Cassa come LAB INFORNATE, con il tuo nome.</p>');
+      '<button class="btn ver big full" data-act="confPaga" data-f="' + X.esc(t) + '">Registra incasso</button><p class="muted" style="font-size:14px">' + (osp() ? 'Il pagamento viene registrato con questo nome e confermato dal direttivo prima di entrare in cassa.' : 'Finisce nel Flusso di Cassa come LAB INFORNATE, con il tuo nome.') + '</p>');
   }
   function toccaZona(t, k, rid) {
     if (rid) return dettaglio(t, rid);
@@ -456,8 +466,9 @@
     apri(X.esc(r.nome), '<div class="riep"><span>' + X.esc(nomeForno(t)) + ' · ' + X.esc(etichetta(r.posti)) + '</span><b>' + (r.prezzo != null ? X.euro(r.prezzo) : '') + '</b></div>' +
       '<p class="muted" style="margin:6px 0 14px">' + X.esc([S.dataSel.slice(8) + '/' + S.dataSel.slice(5, 7), r.temperatura, r.note].filter(String).join(' · ')) + (r.attesa ? ' · <span class="badge ara">da inviare</span>' : '') + '</p>' +
       (r.motivo ? '<p class="muted" style="margin:-6px 0 14px">Importo personalizzato (listino ' + X.esc(X.euro(r.listino)) + '): ' + X.esc(r.motivo) + '</p>' : '') +
+      (r.approvazione === 'da approvare' ? '<p style="margin:-4px 0 14px"><span class="badge ara">importo da approvare</span> <span class="muted">il direttivo deve confermare questo importo</span></p>' : '') +
       (r.pagato ? '<p style="margin:-4px 0 14px">' + pagBadge(r) + (r.pagatoIl ? ' <span class="muted">il ' + X.esc(dataIt(r.pagatoIl)) + '</span>' : '') + '</p>' : '') +
-      '<div class="azioni"><button class="btn lin" data-act="mMod" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">Modifica</button>' + (r.pagato ? '' : '<button class="btn lin" data-act="mAnn" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">Annulla prenotazione</button><button class="btn ver" data-act="mPaga" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">Incassa' + (r.prezzo != null ? ' ' + X.euro(r.prezzo) : '') + '</button>') + '</div>');
+      '<div class="azioni">' + (osp() && r.pagato ? '' : '<button class="btn lin" data-act="mMod" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">Modifica</button>') + (r.pagato ? '' : '<button class="btn lin" data-act="mAnn" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">Annulla prenotazione</button><button class="btn ver" data-act="mPaga" data-f="' + X.esc(t) + '" data-rid="' + X.esc(r.id) + '">' + (osp() ? 'Paga' : 'Incassa') + (r.prezzo != null ? ' ' + X.euro(r.prezzo) : '') + '</button>') + '</div>');
   }
   /* modifica di una prenotazione: chi, giorno, forno, quanti posti, importo, note */
   function formModifica(t, rid) {
@@ -515,7 +526,7 @@
       '<button type="button" class="btn lin full" data-act="mAdd" id="mfAdd" style="margin:4px 0 12px">+ Aggiungi un\'altra persona</button>' +
       '<label class="campo"><span>Note</span><input id="mNote" placeholder="facoltative, es. 6 tazze smaltate"></label>' +
       '<div class="riep"><span>Totale</span><b id="mfTot"></b></div>' +
-      '<button class="btn prim big full" data-act="mConf" data-f="' + X.esc(t) + '" id="mfOk">Prenota</button><p class="muted" style="font-size:14px">L\'importo è quello del listino: puoi cambiarlo per ognuno. Senza rete la prenotazione parte appena torna la connessione.</p>');
+      '<button class="btn prim big full" data-act="mConf" data-f="' + X.esc(t) + '" id="mfOk">Prenota</button><p class="muted" style="font-size:14px">L\'importo è quello del listino: puoi cambiarlo per ognuno' + (osp() ? ' (se è diverso, il direttivo dovrà approvarlo)' : '') + '. Senza rete la prenotazione parte appena torna la connessione.</p>');
     mfDisegna();
   }
   function mfTemp() { var lista = mappa(S.mf.forno, S.dataSel), tf = tempFissa(lista); return tf ? tf.t : valScelta('mtemp'); }
@@ -590,7 +601,7 @@
   function setup() {
     $('#viste').style.display = 'none';
     $('#app').innerHTML = '<div class="setup"><div class="card"><h2>Configura questa postazione</h2><p class="muted">Apri su questo dispositivo il link della postazione Forni (dal gestionale) oppure incolla qui la chiave. Va bene anche il tuo PIN personale, se è il tuo telefono.</p>' +
-      '<label class="campo"><span>Chiave o PIN</span><input id="kIn" autocomplete="off"></label><button class="btn prim full big" data-act="setK">Collega</button></div></div>';
+      '<label class="campo"><span>Chiave o PIN</span><input id="kIn" autocomplete="off"></label><button class="btn prim full big" data-act="setK">Collega</button><button class="btn lin full" data-act="chiaveAnnulla" style="margin-top:8px">Torna alle prenotazioni</button></div></div>';
   }
   function provaChiave() {
     var v = ($('#kIn').value || '').trim(), m = v.match(/[?&]k=([^&]+)/); if (m) v = decodeURIComponent(m[1]); if (!v) return;
@@ -648,12 +659,14 @@
       case 'confPaga': {
         var imp = Number(($('#iImp').value || '').replace(',', '.')); if (!(imp > 0)) return X.toast('Importo non valido.', 'err');
         var chi = X.nomePulito($('#iChi').value); if (!chi) return X.toast('Scrivi chi paga.', 'err');
-        var p = X.accoda({tipo: 'incasso', forno: f, importo: Math.round(imp * 100) / 100, metodo: valScelta('met') || 'contanti', data: X.oggi(), causale: 'Infornata ' + chi + ' · ' + nomeForno(f) + (S.pagaData ? ' ' + S.pagaData.slice(8, 10) + '/' + S.pagaData.slice(5, 7) : ''), cassa: 'LAB INFORNATE', quando: X.adesso(), operatore: operatore(), rif: S.pagaRif || ''});
+        var p = X.accoda({tipo: 'incasso', forno: f, importo: Math.round(imp * 100) / 100, metodo: valScelta('met') || 'contanti', data: X.oggi(), causale: 'Infornata ' + chi + ' · ' + nomeForno(f) + (S.pagaData ? ' ' + S.pagaData.slice(8, 10) + '/' + S.pagaData.slice(5, 7) : ''), cassa: 'LAB INFORNATE', quando: X.adesso(), operatore: osp() ? chi : operatore(), rif: S.pagaRif || ''});
         S.pagaRif = ''; S.pagaData = '';
         var l2 = locali(); l2.push(p); X.set('eventi', l2.slice(-80)); chiudiDlg(); render(); dimentica(); X.toast('Incasso registrato · ' + X.euro(p.importo), 'ok', {label: 'Annulla', fn: function () { annullaInCoda(p.id, 'Incasso'); }}); return;
       }
       case 'pulisciErr': X.set('errori', []); X.aggiornaStato(); return render();
       case 'setK': return provaChiave();
+      case 'chiaveOsp': return setup();
+      case 'chiaveAnnulla': return location.reload();
       case 'opOk': {
         var sel = document.querySelector('[data-op].on'), nome = ($('#opNome').value || '').trim() || (sel ? sel.dataset.op : '');
         if (!nome) return X.toast('Scegli o scrivi un nome.', 'err');
@@ -674,6 +687,7 @@
   X.aiuto('Come si usano i forni', ['Ogni scheda è un forno: vedi se è libero, caricato, in cottura o in raffreddamento, da quanto e chi l’ha usato.', 'Carica il forno → Avvia cottura → Fine cottura → Scaricato: ogni passaggio resta registrato con il tuo nome.', 'Hai toccato il pulsante sbagliato? Tocca Annulla nel messaggio verde.', 'Prenotazioni: scegli il giorno, poi tocca i posti nel disegno del forno (mezzo forno, ripiano, oggetti) o "Forno intero". Il prezzo si calcola da solo.', 'Incassa infornata registra il pagamento nella cassa dell’associazione.', 'Senza rete funziona lo stesso: le operazioni partono quando torna la connessione.', 'Scheda Scorte (laboratorio e forni): Conta quando controlli quanto resta, + Arrivati quando arriva il materiale, − Usati quando lo prendi. Sotto la soglia il direttivo riceve l’avviso.']);
   if (!PUB) X.scorteInit({reparti: ['Laboratorio', 'Forni'], operatore: operatore, chiediOp: function (poi) { scegliOperatore(poi); }, dopo: function () { if (S.vista === 'scorte') render(); }});
   X.avvia('forni', {
+    ospite: true,
     onStato: function (s) {
       S.srv = s;
       var srvIds = {}; ((s.forni && s.forni.storico) || []).forEach(function (e) { srvIds[e.id] = 1; });
@@ -684,9 +698,9 @@
     onChiave: function () { X.salvaChiave(''); setup(); },
     onTick: function () { if (!dlg.open && (S.vista === 'stato' || S.vista === 'pren')) render(); }
   });
-  if (!X.chiave()) setup(); else { S.srv = X.stato(); render(); }
+  S.srv = X.stato(); render();
   setInterval(function () { if (!dlg.open && S.vista === 'stato') render(); }, 30000);
-  if (PUB) {
+  if (PUB && X.chiave()) {
     var ultimo = Date.now();
     ['pointerdown', 'keydown'].forEach(function (t) { document.addEventListener(t, function () { ultimo = Date.now(); }, true); });
     setInterval(function () { if (Date.now() - ultimo > 180000) location.href = '../pubblico/'; }, 15000);

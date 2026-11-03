@@ -200,9 +200,16 @@
   /* ---------- computer pubblico: nessun nome ricordato, si chiede ogni volta ---------- */
   X.pubblico = function () { try { return localStorage.getItem('excv_modo') === 'pubblico'; } catch (e) { return false; } };
 
+  /* ---------- dispositivo (serve solo a limitare gli abusi di chi usa l'app senza chiave) ---------- */
+  X.devId = function () {
+    var d = ''; try { d = localStorage.getItem('excv_dev') || ''; if (!d) { d = (Date.now().toString(36) + Math.random().toString(36).slice(2, 10)).replace(/[^a-z0-9]/g, ''); localStorage.setItem('excv_dev', d); } } catch (e) {}
+    return d || ('x' + Math.random().toString(36).slice(2, 12));
+  };
+
   /* ---------- server ---------- */
   X.call = function (a, extra) {
     var body = {a: a, k: X.chiave()};
+    if (!body.k && opts.ospite) { body.ospite = 1; body.dev = X.devId(); }
     if (opts.extra) body.extra = opts.extra;
     body.attesa = X.coda().length;
     Object.keys(extra || {}).forEach(function (n) { body[n] = extra[n]; });
@@ -237,7 +244,7 @@
   }
 
   X.sync = function (forza) {
-    if (busy || !X.chiave()) return Promise.resolve();
+    if (busy || (!X.chiave() && !opts.ospite)) return Promise.resolve();
     if (!forza && Date.now() < nextAt) return Promise.resolve();
     var c = X.coda();
     if (!c.length && !forza && Date.now() - lastInit < 90000) return Promise.resolve();
@@ -312,7 +319,7 @@
     X.aggiornaNomi(); X.menuApp();
     if (timer) clearInterval(timer);
     timer = setInterval(function () { stato(); X.sync(); if (opts.onTick) opts.onTick(); }, 20000);
-    if (X.chiave()) X.sync(true);
+    if (X.chiave() || opts.ospite) X.sync(true);
   };
 
   /* Invio (tasto blu della tastiera) in un campo di testo: chiude la tastiera; se il campo ha data-invio, preme quel pulsante */
