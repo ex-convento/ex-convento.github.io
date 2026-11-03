@@ -82,6 +82,59 @@
     };
   };
 
+  /* ---------- pagamento con link / QR (SumUp online): serve la rete, il gestionale crea il link e conferma il pagamento ---------- */
+  // o = {link: {collegato, rif, importo, operatore, vendita}, titolo, onPagato: fn(link)}
+  X.linkAttivo = function () { return !!(X.stato() || {}).link; };
+  var qrP = null;
+  function caricaQR() {
+    if (window.qrcode) return Promise.resolve();
+    if (!qrP) qrP = new Promise(function (ok, ko) { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'; s.onload = ok; s.onerror = function () { qrP = null; ko(); }; document.head.appendChild(s); });
+    return qrP;
+  }
+  X.pagaLink = function (o) {
+    if (!navigator.onLine) { X.toast('Per pagare con il link serve la rete.', 'err'); return; }
+    var d = document.getElementById('linkDlg');
+    if (!d) { d = document.createElement('dialog'); d.id = 'linkDlg'; document.body.appendChild(d); d.addEventListener('click', function (e) { if (e.target.closest('[data-chiudi]')) d.close(); }); }
+    var giro = null, fatto = false;
+    d.onclose = function () { clearTimeout(giro); };
+    var testo = function (L) {
+      if (L.stato === 'pagato') return '<b style="color:var(--verde)">✓ Pagato</b> · ' + X.euro(L.importo);
+      if (L.stato !== 'in attesa') return '<b style="color:var(--rosso)">Link ' + X.esc(L.stato) + '</b>: non è stato incassato nulla.';
+      return 'In attesa del pagamento… Il link resta valido 48 ore anche se chiudi: il pagamento si registra da solo.';
+    };
+    d.innerHTML = '<div class="dlg-h"><h2>' + X.esc(o.titolo || 'Paga con carta') + '</h2><button class="dlg-x" data-chiudi aria-label="Chiudi">×</button></div><div class="dlg-b" style="text-align:center"><p class="muted">Preparo il link…</p></div>';
+    d.showModal();
+    X.call('pagaLink', {link: o.link}).then(function (j) {
+      var L = j.link, b = d.querySelector('.dlg-b');
+      b.innerHTML = '<p style="font-size:34px;font-weight:800;margin:4px 0">' + X.euro(L.importo) + '</p><p class="muted" style="margin:0 0 10px">' + X.esc(L.causale) + '</p>' +
+        '<div id="linkQr" style="display:grid;place-items:center;min-height:140px"></div>' +
+        '<p class="muted" style="font-size:15px">Inquadra il QR con la fotocamera del telefono: si paga sulla pagina sicura di SumUp (carta, Apple Pay, Google Pay).</p>' +
+        '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0"><button class="btn lin" id="linkCopia">Copia link</button>' + (navigator.share ? '<button class="btn lin" id="linkShare">Condividi</button>' : '') + '</div>' +
+        '<p id="linkSt" style="padding:12px;border-radius:10px;background:var(--sup2)">' + testo(L) + '</p><button class="btn prim full" data-chiudi>Chiudi</button>';
+      caricaQR().then(function () { var q = qrcode(0, 'M'); q.addData(L.url); q.make(); var el = document.getElementById('linkQr'); if (el) el.innerHTML = '<img alt="QR per pagare" style="width:min(300px,70vw);background:#fff;padding:8px;border-radius:10px;image-rendering:pixelated" src="' + q.createDataURL(8, 2) + '">'; },
+        function () { var el = document.getElementById('linkQr'); if (el) el.innerHTML = '<span class="muted">QR non disponibile: usa Copia link.</span>'; });
+      var cp = document.getElementById('linkCopia'); if (cp) cp.onclick = function () { try { navigator.clipboard.writeText(L.url).then(function () { X.toast('Link copiato'); }); } catch (e) { X.toast(L.url); } };
+      var sh = document.getElementById('linkShare'); if (sh) sh.onclick = function () { navigator.share({title: 'Ex Convento · pagamento', text: L.causale + ' · ' + X.euro(L.importo), url: L.url}).catch(function () {}); };
+      var t0 = Date.now();
+      var controlla = function () {
+        if (!d.open || fatto || Date.now() - t0 > 20 * 60000) return;
+        X.call('statoLink', {id: L.id}).then(function (r) {
+          var n = r.link; if (!d.open) return;
+          if (n.stato !== 'in attesa') {
+            fatto = true; var st = document.getElementById('linkSt'); if (st) st.innerHTML = testo(n);
+            var q = document.getElementById('linkQr'); if (q) q.innerHTML = n.stato === 'pagato' ? '<div style="font-size:90px;color:var(--verde);line-height:1">✓</div>' : '';
+            if (n.stato === 'pagato') { X.toast('Pagamento ricevuto · ' + X.euro(n.importo)); if (o.onPagato) o.onPagato(n); setTimeout(function () { X.sync(true); }, 300); }
+            return;
+          }
+          giro = setTimeout(controlla, 3000);
+        }, function () { giro = setTimeout(controlla, 5000); });
+      };
+      giro = setTimeout(controlla, 3000);
+    }, function (e) {
+      var b = d.querySelector('.dlg-b'); if (b) b.innerHTML = '<p style="color:var(--rosso)">' + X.esc(e.message || 'Link non creato') + '</p><button class="btn prim full" data-chiudi>Chiudi</button>';
+    });
+  };
+
   /* ---------- aiuto in pagina ---------- */
   X.aiuto = function (titolo, punti) {
     var top = document.querySelector('.top'), sync = document.getElementById('sync'); if (!top || document.getElementById('aiutoBtn')) return;

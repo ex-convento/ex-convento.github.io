@@ -313,6 +313,7 @@
     h += '</div><div class="tot"><div class="cifra"><span>Totale</span><span>' + X.euro(totale()) + '</span></div>' +
       '<div class="paga"><button class="btn ver big" data-pay="contanti"' + (S.carrello.length ? '' : ' disabled') + '>Contanti</button>' +
       '<button class="btn blu big" data-pay="carta"' + (S.carrello.length ? '' : ' disabled') + '>Carta</button></div>' +
+      (X.linkAttivo() ? '<button class="btn lin full" data-pay="link" style="margin-top:10px;min-height:52px"' + (S.carrello.length ? '' : ' disabled') + '>Link / QR · paga dal telefono</button>' : '') +
       '<button class="btn lin full" data-pay="omaggio" style="margin-top:10px;min-height:46px"' + (S.carrello.length ? '' : ' disabled') + '>Omaggio / consumo staff</button></div>';
     return h;
   }
@@ -414,9 +415,23 @@
     X.set('operatore', X.ricordaNome(nome)); X.set('opScade', Date.now() + OP_ATTESA); chiudiDlg(); render();
     var poi = S.dopoOp; S.dopoOp = null; if (poi) poi();
   }
+  // tessere vendute al banco: si chiede il nome di ogni socio, così il pagamento si collega al Libro soci
+  function quanteTessere() { return S.carrello.filter(function (r) { return r.id === 'tessera' || /tessera/i.test(r.nome); }).reduce(function (a, r) { return a + Math.max(0, r.q); }, 0); }
+  function chiediTessere(metodo) {
+    var n = Math.min(10, quanteTessere()), campi = '';
+    for (var i = 0; i < n; i++) campi += '<label class="campo"><span>Socio ' + (n > 1 ? (i + 1) + ' ' : '') + '· nome e cognome</span><input class="tesNome" list="excvNomi" autocomplete="off" value="' + X.esc((S.tessere || [])[i] || '') + '"></label>';
+    apri('tessere', n > 1 ? 'Per chi sono le tessere?' : 'Per chi è la tessera?', campi + '<p class="muted" style="font-size:14px">Il pagamento si collega al socio nel Libro soci. Se non c\'è ancora, il direttivo lo vede tra le tessere da assegnare.</p><div class="azioni"><button class="btn lin" data-act="x">Indietro</button><button class="btn prim big" data-act="confTessere" data-met="' + metodo + '">Continua</button></div>');
+    var p = document.querySelector('.tesNome'); if (p) p.focus();
+  }
   function paga(metodo) {
     if (!S.carrello.length) return;
     if (!operatore()) return scegliOperatore(function () { paga(metodo); });
+    if (metodo !== 'omaggio' && quanteTessere() && (S.tessere || []).length < Math.min(10, quanteTessere())) return chiediTessere(metodo);
+    if (metodo === 'link') {
+      var v = nuovaVendita('carta', {link: true});
+      chiudiDlg();
+      return X.pagaLink({link: {collegato: 'bar', vendita: v, operatore: operatore()}, titolo: 'Paga con il telefono', onPagato: function () { salvaVendita(v); }});
+    }
     if (metodo === 'omaggio') {
       apri('omaggio', 'Omaggio o consumo staff', '<div class="resto" style="background:var(--ocra-soft);color:var(--ocra)"><span>' + pezzi() + (pezzi() === 1 ? ' articolo' : ' articoli') + ' · non si incassa</span><span>0,00 €</span></div>' +
         '<p class="muted" style="margin:12px 0 6px">Perché non si paga?</p><div class="scelte" id="omMot">' + ['Consumo staff', 'Omaggio', 'Altro'].map(function (m, i) { return '<button class="scelta' + (i ? '' : ' on') + '" data-mot="' + m + '">' + m + '</button>'; }).join('') + '</div>' +
@@ -445,14 +460,25 @@
     var resto = Math.round((r - t) * 100) / 100;
     el.innerHTML = '<div class="resto' + (resto < 0 ? ' no' : '') + '"><span>Ricevuti ' + X.euro(r) + ' · ' + (resto < 0 ? 'mancano' : 'resto') + '</span><span>' + X.euro(Math.abs(resto)) + '</span></div>';
   }
-  function registraVendita(metodo, extra) {
+  function nuovaVendita(metodo, extra) {
     var v = {tipo: 'vendita', id: X.uuid(), quando: X.adesso(), data: X.oggi(), operatore: operatore(), metodo: metodo,
       righe: S.carrello.map(function (r) { return {id: r.id, nome: r.nome, prezzo: r.prezzo, q: r.q, cassa: r.cassa}; }), totale: totale()};
     if (S.cassa) v.evento = S.cassa;
+    if (metodo !== 'omaggio' && (S.tessere || []).length) v.tessere = S.tessere.slice(0, Math.min(10, quanteTessere()));
     Object.keys(extra || {}).forEach(function (k) { v[k] = extra[k]; });
+    return v;
+  }
+  // vendita pagata con il link: il gestionale l'ha già registrata, qui si tiene la copia locale (stesso codice, niente doppioni)
+  function salvaVendita(v) {
+    var lista = vendite(); if (lista.some(function (x) { return x.id === v.id; })) return;
+    lista.push(v); salvaVendite(lista); X.accoda(v); segnaOperazione();
+    S.carrello = []; S.tessere = []; render();
+  }
+  function registraVendita(metodo, extra) {
+    var v = nuovaVendita(metodo, extra);
     var lista = vendite(); lista.push(v); salvaVendite(lista);
     X.accoda(v); segnaOperazione();
-    S.carrello = []; chiudiDlg(); render();
+    S.carrello = []; S.tessere = []; chiudiDlg(); render();
     X.toast(metodo === 'omaggio' ? 'Registrato come ' + (v.motivo || 'omaggio').toLowerCase() + ' · ' + v.righe.reduce(function (a, r) { return a + r.q; }, 0) + ' pz' : 'Venduto · ' + X.euro(v.totale) + (metodo === 'carta' ? ' con carta' : ' in contanti'), 'ok', {label: 'Annulla', fn: function () { confermaAnnullo(v.id); }});
   }
   function annulla(id) {
@@ -612,9 +638,14 @@
     switch (d.act) {
       case 'x': return chiudiDlg();
       case 'scontrino': return apriScontrino();
-      case 'svuota': S.carrello = []; chiudiDlg(); return render();
+      case 'svuota': S.carrello = []; S.tessere = []; chiudiDlg(); return render();
       case 'ripeti': { var u = ultimaVendita(); if (u) { S.carrello = u.righe.filter(function (r) { return r.q > 0; }).map(function (r) { return {id: r.id, nome: r.nome, prezzo: r.prezzo, cassa: r.cassa, q: r.q}; }); render(); } return; }
       case 'confCarta': return registraVendita('carta');
+      case 'confTessere': {
+        var nomi = [].map.call(document.querySelectorAll('.tesNome'), function (i) { return X.nomePulito(i.value) || ''; });
+        if (nomi.some(function (x) { return x.split(' ').length < 2; })) return X.toast('Scrivi nome e cognome di ogni socio.', 'err');
+        S.tessere = nomi.map(function (x) { return X.ricordaNome(x); }); return paga(d.met);
+      }
       case 'confContanti': return registraVendita('contanti');
       case 'confOmaggio': { var mb = document.querySelector('#omMot .on'); return registraVendita('omaggio', {motivo: mb ? mb.dataset.mot : 'Omaggio', perChi: X.ricordaNome(($('#omChi') || {}).value || '')}); }
       case 'confAnn': return confermaAnnullo(d.id);

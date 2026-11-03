@@ -34,7 +34,11 @@
   } catch (e) {}
   var f = document.getElementById('app');
   f.onload = function () { var w = document.getElementById('wait'); if (w) w.remove(); };
-  f.src = APP + (k ? '?k=' + encodeURIComponent(k) : '');
+  /* ?v=tessera (modulo per diventare soci) e ?v=grazie (dopo un pagamento) aprono subito quella pagina */
+  var v = new URLSearchParams(location.search).get('v') || '', q = [];
+  if (k && !v) q.push('k=' + encodeURIComponent(k));
+  if (/^(tessera|grazie)$/.test(v)) q.push('v=' + v);
+  f.src = APP + (q.length ? '?' + q.join('&') : '');
 </script>
 </body>
 </html>
