@@ -350,7 +350,7 @@
       var annullabile = !v.remoto && !v.chiusa && v.totale > 0 && !v.annullata;
       return '<div class="el' + (v.annullata ? ' ann' : '') + '"><div class="d"><b>' + X.esc(v.righe.map(function (r) { return r.q + '× ' + r.nome; }).join(', ')) + '</b>' +
         '<small>' + X.ora(v.quando) + ' · ' + (v.metodo === 'omaggio' ? '<span class="badge ara">' + X.esc((v.motivo || 'omaggio') + (v.perChi ? ': ' + v.perChi : '')) + '</span>' : v.metodo === 'carta' ? 'carta' : 'contanti') + ' · ' + X.esc(v.operatore || '') +
-        (v.remoto ? ' · <span class="badge">' + X.esc(v.postazione && v.postazione !== S.postazione ? 'da ' + v.postazione : 'altro dispositivo') + '</span>' : coda.indexOf(v.id) >= 0 ? ' · <span class="badge ara">da inviare</span>' : ' · <span class="badge ver">salvato</span>') + (v.chiusa ? ' · chiusa' : '') + '</small></div>' +
+        (v.remoto ? ' · <span class="badge">' + X.esc('altro dispositivo') + '</span>' : coda.indexOf(v.id) >= 0 ? ' · <span class="badge ara">da inviare</span>' : ' · <span class="badge ver">salvato</span>') + (v.chiusa ? ' · chiusa' : '') + '</small></div>' +
         '<b>' + (v.metodo === 'omaggio' ? '0,00 €' : X.euro(v.totale)) + '</b>' + (annullabile ? '<button class="btn lin" data-ann="' + v.id + '" style="min-height:42px;padding:0 12px">Annulla</button>' : '') + '</div>';
     }).join('');
     return h + '</div></div></section>';
