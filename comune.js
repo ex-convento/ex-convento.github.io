@@ -95,8 +95,7 @@
     if (!navigator.onLine) { X.toast('Per pagare con il link serve la rete.', 'err'); return; }
     var d = document.getElementById('linkDlg');
     if (!d) { d = document.createElement('dialog'); d.id = 'linkDlg'; document.body.appendChild(d); d.addEventListener('click', function (e) { if (e.target.closest('[data-chiudi]')) d.close(); }); }
-    var giro = null, fatto = false;
-    d.onclose = function () { clearTimeout(giro); };
+    var tok = {}; d._tok = tok;  /* il controllo del pagamento continua anche se la finestra viene chiusa */
     var testo = function (L) {
       if (L.stato === 'pagato') return '<b style="color:var(--verde)">✓ Pagato</b> · ' + X.euro(L.importo);
       if (L.stato !== 'in attesa') return '<b style="color:var(--rosso)">Link ' + X.esc(L.stato) + '</b>: non è stato incassato nulla.';
@@ -117,19 +116,27 @@
       var sh = document.getElementById('linkShare'); if (sh) sh.onclick = function () { navigator.share({title: 'Ex Convento · pagamento', text: L.causale + ' · ' + X.euro(L.importo), url: L.url}).catch(function () {}); };
       var t0 = Date.now();
       var controlla = function () {
-        if (!d.open || fatto || Date.now() - t0 > 20 * 60000) return;
+        if (Date.now() - t0 > 20 * 60000) return;
         X.call('statoLink', {id: L.id}).then(function (r) {
-          var n = r.link; if (!d.open) return;
+          var n = r.link;
           if (n.stato !== 'in attesa') {
-            fatto = true; var st = document.getElementById('linkSt'); if (st) st.innerHTML = testo(n);
-            var q = document.getElementById('linkQr'); if (q) q.innerHTML = n.stato === 'pagato' ? '<div style="font-size:90px;color:var(--verde);line-height:1">✓</div>' : '';
-            if (n.stato === 'pagato') { X.toast('Pagamento ricevuto · ' + X.euro(n.importo)); if (o.onPagato) o.onPagato(n); setTimeout(function () { X.sync(true); }, 300); }
+            var mio = d._tok === tok && d.open;
+            if (mio) {
+              var st = document.getElementById('linkSt'); if (st) st.innerHTML = testo(n);
+              var q = document.getElementById('linkQr'); if (q) q.innerHTML = n.stato === 'pagato' ? '<div style="font-size:90px;color:var(--verde);line-height:1">✓</div><div style="font:800 30px/1.2 var(--display);color:var(--verde);margin-top:6px">Pagato</div>' : '';
+            }
+            if (n.stato === 'pagato') {
+              X.toast('Pagato · ' + X.euro(n.importo), 'ok');
+              if (o.onPagato) o.onPagato(n);
+              setTimeout(function () { X.sync(true); }, 300);
+              if (mio) setTimeout(function () { if (d._tok === tok && d.open) d.close(); }, 2200);
+            }
             return;
           }
-          giro = setTimeout(controlla, 3000);
-        }, function () { giro = setTimeout(controlla, 5000); });
+          setTimeout(controlla, 3000);
+        }, function () { setTimeout(controlla, 5000); });
       };
-      giro = setTimeout(controlla, 3000);
+      setTimeout(controlla, 3000);
     }, function (e) {
       var b = d.querySelector('.dlg-b'); if (b) b.innerHTML = '<p style="color:var(--rosso)">' + X.esc(e.message || 'Link non creato') + '</p><button class="btn prim full" data-chiudi>Chiudi</button>';
     });

@@ -472,7 +472,10 @@
   function salvaVendita(v) {
     var lista = vendite(); if (lista.some(function (x) { return x.id === v.id; })) return;
     lista.push(v); salvaVendite(lista); X.accoda(v); segnaOperazione();
-    S.carrello = []; S.tessere = []; render();
+    // si svuota lo scontrino solo se è ancora quello appena pagato (altrimenti si sta già servendo un altro cliente)
+    var firma = function (r) { return r.map(function (x) { return x.id + ':' + x.q; }).sort().join('|'); };
+    if (firma(S.carrello) === firma(v.righe)) { S.carrello = []; S.tessere = []; }
+    chiudiDlg(); render();
   }
   function registraVendita(metodo, extra) {
     var v = nuovaVendita(metodo, extra);
